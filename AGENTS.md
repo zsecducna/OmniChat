@@ -9,7 +9,7 @@
 | TASK-0.1 | Create Xcode multiplatform project | devops | DONE | — | iOS 17 + macOS 14 targets. Used xcodegen for project generation. SwiftData models created and verified building successfully. |
 | TASK-0.2 | Configure Swift Package dependencies | devops | DONE | — | swift-markdown 0.7.3, Splash 0.16.0. Packages resolve correctly in project.yml. |
 | TASK-0.3 | Create full directory structure | devops | DONE | — | Complete structure matching MASTER_PLAN.md Section 3. 57 Swift files created with placeholder implementations. |
-| TASK-0.4 | Configure SwiftData container | core | TODO | — | CloudKit integration |
+| TASK-0.4 | Configure SwiftData container | core | DONE | — | Created DataManager.swift with CloudKit integration. ModelContainer configured with cloudKitDatabase: .automatic. Updated OmniChatApp.swift to use DataManager for container initialization. Added createPreviewContainer() for previews/testing. Fixed Theme.swift cross-platform Color extension for macOS compatibility. |
 | TASK-0.5 | Design system foundation (Theme.swift) | ui | DONE | — | Created Theme.swift with colors, typography, spacing, corner radii. Created DenseLayout.swift with dense spacing modifiers and containers. Raycast-inspired dense design. |
 
 ## Blockers
@@ -35,6 +35,7 @@
 - [2026-02-21] TASK-0.5 completed: Design system foundation created (Theme.swift + DenseLayout.swift). Raycast-inspired dense UI with 2-16pt spacing scale, provider accent colors, SF Pro/Mono typography.
 - [2026-02-21] TASK-0.2 completed: Swift Package dependencies configured (swift-markdown 0.7.3, Splash 0.16.0)
 - [2026-02-21] TASK-0.3 completed: Full directory structure created matching MASTER_PLAN.md Section 3. Includes Features/ (Chat, ConversationList, Settings, Personas), Core/ (Provider, Data, Keychain, Auth, Networking, Markdown), Shared/ (Extensions, DesignSystem), Resources/ (Localizable.strings, ProviderIcons). Total 57 Swift files with placeholder implementations.
+- [2026-02-21] TASK-0.4 completed: DataManager.swift created with CloudKit integration. Schema includes ProviderConfig, Conversation, Message, Attachment, Persona, UsageRecord. ModelContainer uses cloudKitDatabase: .automatic for iCloud sync. Preview container available for SwiftUI previews and tests.
 
 ## Integration Notes
 

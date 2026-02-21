@@ -257,6 +257,7 @@ private extension Color {
     ///   - light: The color to use in light mode
     ///   - dark: The color to use in dark mode
     init(light: Color, dark: Color) {
+        #if os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
         self.init(uiColor: UIColor { traitCollection in
             switch traitCollection.userInterfaceStyle {
             case .dark:
@@ -265,6 +266,11 @@ private extension Color {
                 return UIColor(light)
             }
         })
+        #else
+        // On macOS and other platforms, use a simple approach
+        // The Color will automatically adapt if using asset catalog colors
+        self.init(light)
+        #endif
     }
 }
 
