@@ -68,6 +68,7 @@
 		6EFFE49999B840581CBED412 /* SyntaxHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E69AA6B4C382BFE237FC7999 /* SyntaxHighlighter.swift */; };
 		6F399DE64041138640C781A8 /* OmniChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6B7F8FDFE18EE61C637571 /* OmniChatApp.swift */; };
 		71D0DCCE38ED10FD462D4B06 /* ConversationListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F11B62768DCB5A7CAC19C7C /* ConversationListViewModel.swift */; };
+		7397064729FC8CD31594D713 /* PersonaPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C52E6FBC5D925B2CD4E211 /* PersonaPicker.swift */; };
 		74A4A02C19744471CDCC1EA9 /* MessageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E6EC3C89D998FC4AD49D0F /* MessageStore.swift */; };
 		786F51C8CF8F8B8DD45A3B11 /* MessageInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1AE123EED456790F38476BE /* MessageInputBar.swift */; };
 		8190DF31D3B3E1CDAB8D23E2 /* DataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40617951D14503F69903872 /* DataManager.swift */; };
@@ -139,6 +140,7 @@
 		FBC8ABD6A020A12860FCD915 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334F88E4ACC6318E709FC263 /* Constants.swift */; };
 		FD7F6D60B0D7D8903F27184F /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E38AA0377D78A02D2CF34C /* Date+Extensions.swift */; };
 		FDD8A705E83DB73E6F658AAC /* CodeBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B2ECB2203EE9195218E987 /* CodeBlockView.swift */; };
+		FF4E8A256F85CA2E51D8AE7D /* PersonaPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C52E6FBC5D925B2CD4E211 /* PersonaPicker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -233,6 +235,7 @@
 		CCB176034C52C9EF8B6464D1 /* MessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubble.swift; sourceTree = "<group>"; };
 		CCBEE8996CD286D80D4B1E4C /* OpenAIAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIAdapter.swift; sourceTree = "<group>"; };
 		CF5A8B9B03CC85F4E47B22A8 /* Attachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attachment.swift; sourceTree = "<group>"; };
+		D3C52E6FBC5D925B2CD4E211 /* PersonaPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaPicker.swift; sourceTree = "<group>"; };
 		D4089AEDC23380A21CBEB906 /* PersonaViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaViewModel.swift; sourceTree = "<group>"; };
 		D54D2319E9122F8CC65601BE /* PersonaListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaListView.swift; sourceTree = "<group>"; };
 		DD38DA76F1B4911D2EF4F533 /* OmniChatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmniChatTests.swift; sourceTree = "<group>"; };
@@ -458,6 +461,7 @@
 		7D849BC6C31E5CD5220A0347 /* Personas */ = {
 			isa = PBXGroup;
 			children = (
+				F42B85661572CB0E44A1B5E2 /* Components */,
 				5733921D57F1EB51F30EE2D3 /* ViewModels */,
 				E5AA16B51D6C86EF1F94310C /* Views */,
 			);
@@ -598,6 +602,14 @@
 				EE1FB5C6310C30ACFB17D299 /* PersonaPickerSheet.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		F42B85661572CB0E44A1B5E2 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				D3C52E6FBC5D925B2CD4E211 /* PersonaPicker.swift */,
+			);
+			path = Components;
 			sourceTree = "<group>";
 		};
 		F4731CC31DF698BC7425E601 /* Features */ = {
@@ -886,6 +898,7 @@
 				0A15E92FB80DA78D662E3B79 /* Persona.swift in Sources */,
 				313EECC5749789520525451B /* PersonaEditorView.swift in Sources */,
 				DDEC73CF1443AF95D724612A /* PersonaListView.swift in Sources */,
+				7397064729FC8CD31594D713 /* PersonaPicker.swift in Sources */,
 				3E2B03D28DBBE6A63723EE50 /* PersonaPickerSheet.swift in Sources */,
 				38DBFCE4DDF18AD1ED6193E9 /* PersonaViewModel.swift in Sources */,
 				5975687E7A2E043D7AAC5FB3 /* ProviderConfig.swift in Sources */,
@@ -961,6 +974,7 @@
 				99E92B618580FCD2E313D35C /* Persona.swift in Sources */,
 				A3540371F0927CAD53B7B3EB /* PersonaEditorView.swift in Sources */,
 				562F64AB3B84E4079187DF5D /* PersonaListView.swift in Sources */,
+				FF4E8A256F85CA2E51D8AE7D /* PersonaPicker.swift in Sources */,
 				34E7FFE0432B198F83CC74E3 /* PersonaPickerSheet.swift in Sources */,
 				090160A7E342B774B051EB71 /* PersonaViewModel.swift in Sources */,
 				D6229A51C053A6556183661F /* ProviderConfig.swift in Sources */,
