@@ -1,16 +1,41 @@
 # OmniChat Agent Task Board
 
-## Current Phase: Phase 0 — Project Setup
+## Current Phase: Phase 1 — Core Data & Provider Layer
+
+## Phase 0 Summary (COMPLETE)
+All Phase 0 tasks completed successfully:
+- Xcode multiplatform project created with xcodegen
+- Swift Package dependencies (swift-markdown, Splash)
+- Full directory structure matching MASTER_PLAN.md
+- SwiftData container with CloudKit integration
+- Raycast-inspired design system foundation
+
+---
 
 ## Task Status
 
+### Phase 1 Tasks
+
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
-| TASK-0.1 | Create Xcode multiplatform project | devops | DONE | — | iOS 17 + macOS 14 targets. Used xcodegen for project generation. SwiftData models created and verified building successfully. |
-| TASK-0.2 | Configure Swift Package dependencies | devops | DONE | — | swift-markdown 0.7.3, Splash 0.16.0. Packages resolve correctly in project.yml. |
-| TASK-0.3 | Create full directory structure | devops | DONE | — | Complete structure matching MASTER_PLAN.md Section 3. 57 Swift files created with placeholder implementations. |
-| TASK-0.4 | Configure SwiftData container | core | DONE | — | Created DataManager.swift with CloudKit integration. ModelContainer configured with cloudKitDatabase: .automatic. Updated OmniChatApp.swift to use DataManager for container initialization. Added createPreviewContainer() for previews/testing. Fixed Theme.swift cross-platform Color extension for macOS compatibility. |
-| TASK-0.5 | Design system foundation (Theme.swift) | ui | DONE | — | Created Theme.swift with colors, typography, spacing, corner radii. Created DenseLayout.swift with dense spacing modifiers and containers. Raycast-inspired dense design. |
+| TASK-1.1 | Implement SwiftData Models | core | TODO | — | CRUD ops, computed properties, cascade delete |
+| TASK-1.2 | Implement KeychainManager | core | TODO | — | save/read/delete/exists with iCloud Keychain sync |
+| TASK-1.3 | Define AIProvider Protocol | core | TODO | — | Protocol + ChatMessage + StreamEvent types |
+| TASK-1.4 | Implement SSE Parser | core | DONE | — | Full SSE parser with AsyncThrowingStream, handles all SSE fields, [DONE] termination, multi-line data |
+| TASK-1.5 | Implement HTTPClient | core | TODO | — | URLSession wrapper with streaming support |
+| TASK-1.6 | Implement AnthropicAdapter | core | TODO | TASK-1.3, TASK-1.4, TASK-1.5 | Claude Messages API |
+| TASK-1.7 | Implement OpenAIAdapter | core | TODO | TASK-1.3, TASK-1.4, TASK-1.5 | Chat Completions API |
+| TASK-1.8 | Implement ProviderManager | core | TODO | TASK-1.6, TASK-1.7 | Registry, factory, selection |
+
+### Phase 0 Tasks (COMPLETE)
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-0.1 | Create Xcode multiplatform project | devops | DONE | — | iOS 17 + macOS 14 targets. Used xcodegen. |
+| TASK-0.2 | Configure Swift Package dependencies | devops | DONE | — | swift-markdown 0.7.3, Splash 0.16.0 |
+| TASK-0.3 | Create full directory structure | devops | DONE | — | 57 Swift files with placeholder implementations |
+| TASK-0.4 | Configure SwiftData container | core | DONE | — | DataManager.swift with CloudKit integration |
+| TASK-0.5 | Design system foundation | ui | DONE | — | Theme.swift + DenseLayout.swift |
 
 ## Blockers
 
@@ -18,6 +43,7 @@
 
 ## Decisions Log
 
+- [2026-02-21] TASK-1.4 completed: SSEParser.swift implemented with full SSE spec support. Parses data/event/id/retry fields, handles [DONE] termination, multi-line data, comments, empty line separators. Provides parseData() for raw Data output and parseEvents() for structured SSEEvent output. Includes decodeJSON() convenience method with Sendable constraint for Swift 6 compliance.
 - [2026-02-21] Project created. Architecture: SwiftUI + SwiftData + CloudKit
 - [2026-02-21] Dense Raycast-style UI confirmed
 - [2026-02-21] Swift 6 strict concurrency enabled
