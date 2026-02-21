@@ -6,7 +6,7 @@
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
-| TASK-0.1 | Create Xcode multiplatform project | devops | DONE | — | iOS 17 + macOS 14 targets. Used xcodegen for project generation. SwiftData models created. |
+| TASK-0.1 | Create Xcode multiplatform project | devops | DONE | — | iOS 17 + macOS 14 targets. Used xcodegen for project generation. SwiftData models created and verified building successfully. |
 | TASK-0.2 | Configure Swift Package dependencies | devops | TODO | — | swift-markdown, Splash |
 | TASK-0.3 | Create full directory structure | devops | TODO | — | Match MASTER_PLAN.md Section 3 |
 | TASK-0.4 | Configure SwiftData container | core | TODO | — | CloudKit integration |
@@ -26,6 +26,7 @@
 - [2026-02-21] Bundle ID: com.yourname.omnichat (user should update this)
 - [2026-02-21] iCloud container: iCloud.com.yourname.omnichat (user should update this)
 - [2026-02-21] SwiftData models pre-created: Conversation, Message, Attachment, ProviderConfig, Persona, UsageRecord
+- [2026-02-21] SwiftData models verified: Build succeeds on both iOS and macOS. Cross-file @Relationship references work correctly (Conversation -> Message -> Attachment chain)
 - [2026-02-21] AppState uses @MainActor for Swift 6 strict concurrency compliance
 
 ## Integration Notes
