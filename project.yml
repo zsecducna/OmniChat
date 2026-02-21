@@ -32,7 +32,9 @@ targets:
     platform: [iOS, macOS]
     sources:
       - OmniChat
-    dependencies: []
+    dependencies:
+      - package: Markdown
+      - package: Splash
     settings:
       base:
         INFOPLIST_FILE: OmniChat/Info.plist

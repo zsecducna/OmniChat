@@ -80,6 +80,8 @@
 		99E92B618580FCD2E313D35C /* Persona.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FF80BD25EA364923296841C /* Persona.swift */; };
 		99F8F0F05B7012CEB30A63DB /* MarkdownParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C90BAA5D9ADEB0450552264 /* MarkdownParser.swift */; };
 		9AB048EB45B4DBB84AD63482 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A0F3641509DCE5F92C3E12 /* ChatViewModel.swift */; };
+		9E39310E997E210A9EEBD091 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = E4DBE86DC9004EFCE8A45EF8 /* Markdown */; };
+		9F5776CB8E9EE8A0A67C98F7 /* Splash in Frameworks */ = {isa = PBXBuildFile; productRef = 24FCA68F5807F380E71C4923 /* Splash */; };
 		A008E9A183371F265B9F54D8 /* MessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB176034C52C9EF8B6464D1 /* MessageBubble.swift */; };
 		A124542F910C61F058C60F3D /* UsageRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B2E2936E018ECB58BCDB223 /* UsageRecord.swift */; };
 		A17A244A59A8974BC80D9DCD /* SearchableConversationList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B529ACE71FA0245354906E85 /* SearchableConversationList.swift */; };
@@ -101,6 +103,7 @@
 		BA802601BDF4D2948B05BCBC /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E38AA0377D78A02D2CF34C /* Date+Extensions.swift */; };
 		BAF8E6180408CD010B23EAE3 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A55B5DC7624CF6BDA5A76A /* String+Extensions.swift */; };
 		BB17CEB200A22A78A66EA18D /* OAuthConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72D94CBE15C5097E26B2B36 /* OAuthConfig.swift */; };
+		BB891905645A12C962F81338 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 4BCD5BDCA2F6E8A224C40EFD /* Markdown */; };
 		BBA0A22E15F64A2FE71E9DEC /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA14AEAC731323F04CE6017E /* AppState.swift */; };
 		BC5E2437471BE5E37FBF4EEF /* OAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31F4406D47EF5E212CBBFBE /* OAuthManager.swift */; };
 		BCF9F299DEFE568C3E3A8654 /* ChatToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19CA6627067888A88936E27 /* ChatToolbar.swift */; };
@@ -125,6 +128,7 @@
 		E83719E6DD3E682EB330610A /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08101B0E2EC8D7AE97637EDF /* KeychainManager.swift */; };
 		ED342608FE273B6CB606EC7C /* SearchableConversationList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B529ACE71FA0245354906E85 /* SearchableConversationList.swift */; };
 		F253A6BE0F01C3AF43229962 /* UsageRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B2E2936E018ECB58BCDB223 /* UsageRecord.swift */; };
+		F4C128EE0FA2FFD21B17F60C /* Splash in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE5DB2EEB60015F15C319DC /* Splash */; };
 		F8BA4B399D4811A910392EB2 /* ProviderSetupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E0A95A4CC0683754958A4B9 /* ProviderSetupViewModel.swift */; };
 		FBC8ABD6A020A12860FCD915 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334F88E4ACC6318E709FC263 /* Constants.swift */; };
 		FD7F6D60B0D7D8903F27184F /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E38AA0377D78A02D2CF34C /* Date+Extensions.swift */; };
@@ -234,6 +238,27 @@
 		FD6B7F8FDFE18EE61C637571 /* OmniChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmniChatApp.swift; sourceTree = "<group>"; };
 		FD777A7EED9E8C206C22AA45 /* StreamingTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingTextView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		045F2555BF67643CF9AA79DF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9E39310E997E210A9EEBD091 /* Markdown in Frameworks */,
+				F4C128EE0FA2FFD21B17F60C /* Splash in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		708E0576C2CB43E074900755 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB891905645A12C962F81338 /* Markdown in Frameworks */,
+				9F5776CB8E9EE8A0A67C98F7 /* Splash in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0231805B589E0EC0D3ECCB00 /* OmniChat */ = {
@@ -655,6 +680,7 @@
 			buildPhases = (
 				51ADCFB33795A1513EB0CE08 /* Sources */,
 				D9330E6CD673B78BAAF6B4E6 /* Resources */,
+				045F2555BF67643CF9AA79DF /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -662,6 +688,8 @@
 			);
 			name = OmniChat_iOS;
 			packageProductDependencies = (
+				E4DBE86DC9004EFCE8A45EF8 /* Markdown */,
+				2AE5DB2EEB60015F15C319DC /* Splash */,
 			);
 			productName = OmniChat_iOS;
 			productReference = 5AFB4ED0BDAA6C019E7AAFD2 /* OmniChat.app */;
@@ -673,6 +701,7 @@
 			buildPhases = (
 				C2FC65E28718F5F48A2752AC /* Sources */,
 				CB9509D02D0FA675E83BFB1C /* Resources */,
+				708E0576C2CB43E074900755 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -680,6 +709,8 @@
 			);
 			name = OmniChat_macOS;
 			packageProductDependencies = (
+				4BCD5BDCA2F6E8A224C40EFD /* Markdown */,
+				24FCA68F5807F380E71C4923 /* Splash */,
 			);
 			productName = OmniChat_macOS;
 			productReference = 42F24BA114CEC0681218AC96 /* OmniChat.app */;
@@ -1415,6 +1446,29 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		24FCA68F5807F380E71C4923 /* Splash */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5E29F2DAC3791485B63AC291 /* XCRemoteSwiftPackageReference "Splash" */;
+			productName = Splash;
+		};
+		2AE5DB2EEB60015F15C319DC /* Splash */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5E29F2DAC3791485B63AC291 /* XCRemoteSwiftPackageReference "Splash" */;
+			productName = Splash;
+		};
+		4BCD5BDCA2F6E8A224C40EFD /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 640427BB0F6B60FEED79ED6C /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+		E4DBE86DC9004EFCE8A45EF8 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 640427BB0F6B60FEED79ED6C /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EDABFA14BF7A849BBA352B1C /* Project object */;
 }
