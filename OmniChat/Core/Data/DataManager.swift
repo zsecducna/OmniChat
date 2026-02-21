@@ -14,6 +14,43 @@ import os
 /// This enum provides factory methods for creating `ModelContainer` instances
 /// configured for production (with CloudKit sync) and preview/testing (in-memory).
 ///
+/// ## CloudKit Configuration
+///
+/// The production container syncs data via iCloud using CloudKit:
+/// - **Container**: `iCloud.com.yourname.omnichat`
+/// - **Database**: Automatic (uses user's private CloudKit database)
+/// - **Requirements**:
+///   - iCloud capability enabled in Xcode project
+///   - CloudKit container identifier in entitlements
+///   - User signed into iCloud on device
+///   - Network connectivity for sync
+///
+/// ## Testing CloudKit Sync Between Devices
+///
+/// ### Prerequisites
+/// 1. Sign in to iCloud with the same Apple ID on both devices
+/// 2. Enable iCloud Drive in System Settings/Preferences
+/// 3. Build and run app on both devices with same provisioning profile
+///
+/// ### Testing Steps
+/// 1. **Create test data**: On Device A, create a new conversation and add messages
+/// 2. **Wait for sync**: CloudKit syncs automatically (typically 5-30 seconds)
+/// 3. **Verify on Device B**: Open app on second device, pull-to-refresh or relaunch
+/// 4. **Check CloudKit Dashboard**: Visit https://icloud.developer.apple.com
+///    - Select container: `iCloud.com.yourname.omnichat`
+///    - View records in Private Database > Default Zone
+///
+/// ### Debugging Sync Issues
+/// - Check Console.app for `CloudKit` or `NSPersistentCloudKitContainer` logs
+/// - Verify entitlements in built app: `codesign -d --entitlements :- path/to/app.app`
+/// - Ensure deployment target is iOS 17.0+ or macOS 14.0+
+/// - Test on physical devices (simulators have limited iCloud support)
+///
+/// ### Simulator Limitations
+/// - iOS Simulator: Must sign into iCloud in Settings
+/// - CloudKit sync works but may be slower than physical devices
+/// - First launch requires iCloud authentication prompt
+///
 /// ## Usage
 ///
 /// ### Production Container
@@ -158,4 +195,120 @@ enum DataManager {
     /// This is a convenience property equivalent to calling `createPreviewContainer()`.
     /// Use this when you need quick access to a preview container without calling the method.
     static let previewContainer: ModelContainer = createPreviewContainer()
+
+    // MARK: - Constants
+
+    /// User defaults key for tracking whether iCloud has been enabled before.
+    ///
+    /// Used to detect first-time CloudKit setup and trigger any necessary migrations.
+    static let iCloudEnabledKey = "com.yourname.omnichat.icloud.enabled"
+
+    /// User defaults key for tracking the last known CloudKit sync timestamp.
+    static let lastSyncTimestampKey = "com.yourname.omnichat.icloud.lastSync"
+}
+
+// MARK: - iCloud Sync Helpers
+
+extension DataManager {
+    /// Checks if iCloud sync has been enabled for this user before.
+    ///
+    /// - Returns: `true` if the user has previously enabled iCloud sync.
+    ///
+    /// - Note: Use this to detect first-time iCloud setup and trigger migrations.
+    static func isiCloudEnabled() -> Bool {
+        UserDefaults.standard.bool(forKey: iCloudEnabledKey)
+    }
+
+    /// Marks iCloud sync as enabled in user defaults.
+    ///
+    /// Call this after successfully setting up CloudKit for the first time.
+    static func markiCloudEnabled() {
+        UserDefaults.standard.set(true, forKey: iCloudEnabledKey)
+        logger.info("iCloud sync marked as enabled")
+    }
+
+    /// Records the current timestamp as the last sync time.
+    ///
+    /// This can be used to track sync health and detect stale data.
+    static func recordSyncTimestamp() {
+        UserDefaults.standard.set(Date(), forKey: lastSyncTimestampKey)
+        logger.debug("Recorded sync timestamp")
+    }
+
+    /// Returns the timestamp of the last recorded sync, if any.
+    ///
+    /// - Returns: The last sync timestamp, or nil if never synced.
+    static func lastSyncTimestamp() -> Date? {
+        UserDefaults.standard.object(forKey: lastSyncTimestampKey) as? Date
+    }
+
+    /// Performs first-time iCloud setup tasks if needed.
+    ///
+    /// This method should be called early in the app lifecycle (e.g., in `onAppear`
+    /// of the root view or in the app delegate) to handle any necessary migrations
+    /// or setup when iCloud is enabled for the first time.
+    ///
+    /// - Parameter container: The model container to use for migrations
+    ///
+    /// - Note: SwiftData automatically handles local-to-CloudKit migration for
+    ///         most cases. This method is for additional custom setup if needed.
+    static func performFirstTimeSetupIfNeeded(container: ModelContainer) {
+        let isFirstTime = !isiCloudEnabled()
+
+        if isFirstTime {
+            logger.info("First-time iCloud setup detected")
+
+            // SwiftData handles local-to-CloudKit migration automatically.
+            // No explicit migration code needed for basic cases.
+
+            // Seed default personas if needed
+            let context = container.mainContext
+            Persona.seedDefaults(into: context)
+
+            // Mark as enabled
+            markiCloudEnabled()
+
+            logger.info("First-time iCloud setup completed")
+        }
+    }
+}
+
+// MARK: - Sync Status Monitoring
+
+extension DataManager {
+    /// Represents the current sync status with CloudKit.
+    enum SyncStatus: Sendable {
+        /// Not yet determined
+        case unknown
+        /// Sync is in progress
+        case syncing
+        /// Successfully synced
+        case synced
+        /// Sync failed or unavailable
+        case failed(Error?)
+        /// iCloud is not available (not signed in or no network)
+        case unavailable
+    }
+
+    /// Returns a human-readable description of the sync status.
+    ///
+    /// - Parameter status: The sync status to describe
+    /// - Returns: A localized string describing the status
+    static func description(for status: SyncStatus) -> String {
+        switch status {
+        case .unknown:
+            return "Sync status unknown"
+        case .syncing:
+            return "Syncing with iCloud..."
+        case .synced:
+            return "All changes synced"
+        case .failed(let error):
+            if let error = error {
+                return "Sync failed: \(error.localizedDescription)"
+            }
+            return "Sync failed"
+        case .unavailable:
+            return "iCloud unavailable"
+        }
+    }
 }

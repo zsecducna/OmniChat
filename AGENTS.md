@@ -1,19 +1,29 @@
 # OmniChat Agent Task Board
 
-## Current Phase: Phase 5 — Personas & System Prompts
+## Current Phase: Phase 6 — iCloud Sync & Polish
 
-## Phase 0, 1, 2, 3 & 4 Summary (COMPLETE)
+## Phase 0, 1, 2, 3, 4 & 5 Summary (COMPLETE)
 - **Phase 0**: Xcode project, dependencies, directory structure, SwiftData container, design system
 - **Phase 1**: SwiftData models, KeychainManager, AIProvider protocol, HTTPClient, SSEParser, AnthropicAdapter, OpenAIAdapter, ProviderManager
 - **Phase 2**: ContentView, ConversationListView, ChatView, MessageBubble, MessageInputBar, ChatViewModel, StreamingTextView
 - **Phase 3**: SettingsView, ProviderListView, ProviderSetupView, DefaultsSettingsView
 - **Phase 4**: MarkdownParser, SyntaxHighlighter, CodeBlockView, MessageBubble with Markdown, AttachmentPicker, ModelSwitcher
+- **Phase 5**: PersonaListView, PersonaEditorView, PersonaPicker, Personas connected to Chat
 
 ---
 
 ## Task Status
 
-### Phase 5 Tasks
+### Phase 6 Tasks
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-6.1 | Configure CloudKit Container | devops | DONE | — | CloudKit container configured: iCloud.com.yourname.omnichat. SwiftData ModelConfiguration has cloudKitDatabase: .automatic. Entitlements include com.apple.developer.icloud-container-identifiers and com.apple.developer.icloud-services (CloudKit, Key-value-store). Added comprehensive developer documentation to DataManager.swift for testing sync between devices. Both iOS and macOS builds succeed. |
+| TASK-6.2 | Handle Sync Conflicts | core | TODO | — | Handle SwiftData+CloudKit conflicts, last-write-wins for critical fields |
+| TASK-6.3 | Optimize Attachment Sync | core | TODO | — | CloudKit assets for Data fields, thumbnail generation, lazy loading |
+| TASK-6.4 | UI Polish Pass | ui | TODO | — | Animations, empty/error/loading states, haptic feedback |
+
+### Phase 5 Tasks (COMPLETE)
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
@@ -68,10 +78,12 @@
 
 ## Blockers
 
-None - Phase 4 complete. Both iOS and macOS builds succeed.
+None - Phase 5 complete. Both iOS and macOS builds succeed.
 
 ## Decisions Log
 
+- [2026-02-22] TASK-6.1 completed: CloudKit container configuration verified and documented. Configuration already in place: (1) project.yml entitlements section has iCloud container identifier and services; (2) OmniChat.entitlements file contains com.apple.developer.icloud-container-identifiers (iCloud.com.yourname.omnichat) and com.apple.developer.icloud-services (CloudKit, Key-value-store); (3) DataManager.swift uses ModelConfiguration with cloudKitDatabase: .automatic. Added comprehensive developer documentation to DataManager.swift doc comments including: prerequisites for testing, step-by-step testing instructions, debugging tips (Console.app, codesign verification), simulator limitations, and CloudKit Dashboard usage. Both iOS and macOS builds succeed.
+- [2026-02-22] PHASE 5 COMPLETE: All 4 Phase 5 tasks completed. Personas & System Prompts feature is fully implemented. Key accomplishments: (1) PersonaListView with built-in/custom sections, search, swipe actions; (2) PersonaEditorView with SF Symbol picker, validation, character counter; (3) PersonaPicker inline component for settings/conversations; (4) ChatViewModel integration with persona system prompts. Both iOS and macOS builds succeed. Ready for Phase 6 (iCloud Sync & Polish).
 - [2026-02-22] TASK-5.4 completed: Connected personas to chat flow in ChatViewModel.swift. Implementation approach: (1) Added resolveSystemPrompt() method that resolves the effective system prompt for the current conversation - priority order is persona's systemPrompt > conversation's direct systemPrompt > nil; (2) Added fetchPersona(id:) helper to fetch Persona from SwiftData by UUID; (3) Added activePersona computed property for UI components to display the current persona; (4) Updated sendMessage() to use resolveSystemPrompt() instead of directly accessing conversation.systemPrompt; (5) Handles deleted personas gracefully by falling back to conversation's systemPrompt with a warning log; (6) Empty persona systemPrompt (like "Default" persona) returns nil to avoid sending empty system messages. iOS build succeeds. Note: Pre-existing PersonaListView.swift error (compiler type-check timeout) blocks macOS build - UI Agent to address.
 - [2026-02-22] PHASE 4 COMPLETE: All 6 Phase 4 tasks completed. Advanced Chat Features are now fully implemented. Key accomplishments: (1) MarkdownParser using swift-markdown 0.7.3 for full markdown rendering; (2) SyntaxHighlighter with 17 language support; (3) CodeBlockView with copy button and syntax highlighting; (4) MessageBubble upgraded with markdown support and code block rendering; (5) AttachmentPicker with PhotosPicker and FileImporter; (6) ModelSwitcher with platform-adaptive UI for provider/model switching. Both iOS and macOS builds succeed. Ready for Phase 5 (Personas & System Prompts).
 - [2026-02-22] TASK-4.6 completed: ModelSwitcher implemented in Features/Chat/Components/ModelSwitcher.swift. Comprehensive model/provider switching component with Raycast-inspired dense UI. Key implementation decisions: (1) Platform-adaptive presentation - uses popover on iOS (with searchable sheet) and nested Menu on macOS for native feel; (2) Component hierarchy - ModelSwitcher (main), CompactModelSwitcher (for tight spaces), ModelPickerRow (reusable row), ModelPickerSheet (iOS-only sheet), ModelPickerMenuContent (macOS-only menu); (3) Integration with ProviderManager to fetch enabled providers and their available models; (4) Provider color coding using Theme.Colors.accentColor(for:) helper; (5) Vision support indicator (eye icon) for models that support image input; (6) Search filtering on iOS for quick model discovery; (7) Current selection highlighted with checkmark; (8) ChatView.swift updated to inject ProviderManager via @State and use new components in toolbar and input bar; (9) Removed old placeholder sheet code from ChatView; (10) Fixed xcodegen project regeneration to include new files. Both iOS and macOS builds succeed.
