@@ -8,6 +8,8 @@
 import Foundation
 import SwiftData
 
+/// Represents a system prompt template (persona) that can be applied to conversations.
+/// Built-in personas are shipped with the app; users can also create custom ones.
 @Model
 final class Persona {
     var id: UUID
@@ -18,6 +20,8 @@ final class Persona {
     var sortOrder: Int
     var createdAt: Date
     var updatedAt: Date
+
+    // MARK: - Initialization
 
     init(
         id: UUID = UUID(),
@@ -37,5 +41,122 @@ final class Persona {
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    // MARK: - Helper Methods
+
+    /// Updates the updatedAt timestamp to now.
+    func touch() {
+        updatedAt = Date()
+    }
+}
+
+// MARK: - Default Personas
+
+extension Persona {
+    /// Returns the list of built-in personas to seed on first launch.
+    static var defaultPersonas: [Persona] {
+        [
+            Persona(
+                name: "Default",
+                systemPrompt: "",
+                icon: "bubble.left",
+                isBuiltIn: true,
+                sortOrder: 0
+            ),
+            Persona(
+                name: "Code Assistant",
+                systemPrompt: """
+                You are an expert programmer and software architect. Your responses should be:
+                - Clear, concise, and well-structured
+                - Include code examples when relevant
+                - Explain trade-offs and best practices
+                - Focus on writing maintainable, efficient, and secure code
+                - Use modern language features and idiomatic patterns
+                """,
+                icon: "chevron.left.forwardslash.chevron.right",
+                isBuiltIn: true,
+                sortOrder: 1
+            ),
+            Persona(
+                name: "Writing Editor",
+                systemPrompt: """
+                You are a professional editor and writing coach. Your role is to:
+                - Improve clarity, flow, and readability
+                - Correct grammar, punctuation, and spelling
+                - Enhance style and tone appropriate for the context
+                - Preserve the author's voice while strengthening the writing
+                - Provide constructive feedback with specific suggestions
+                """,
+                icon: "pencil.and.outline",
+                isBuiltIn: true,
+                sortOrder: 2
+            ),
+            Persona(
+                name: "Translator",
+                systemPrompt: """
+                You are a multilingual translator and language expert. You should:
+                - Provide accurate, natural-sounding translations
+                - Preserve the original meaning, tone, and nuance
+                - Consider cultural context and idioms
+                - Explain translation choices when helpful
+                - Offer alternatives when there are multiple valid translations
+                """,
+                icon: "character.bubble",
+                isBuiltIn: true,
+                sortOrder: 3
+            ),
+            Persona(
+                name: "Summarizer",
+                systemPrompt: """
+                You are an expert at creating concise, accurate summaries. Your summaries should:
+                - Capture the key points and main ideas
+                - Be significantly shorter than the original
+                - Maintain the essential meaning and context
+                - Use clear, straightforward language
+                - Structure information logically
+                """,
+                icon: "doc.text.magnifyingglass",
+                isBuiltIn: true,
+                sortOrder: 4
+            ),
+            Persona(
+                name: "Research Assistant",
+                systemPrompt: """
+                You are a thorough research assistant. You should:
+                - Provide comprehensive, well-researched information
+                - Cite sources and explain reasoning
+                - Present multiple perspectives on complex topics
+                - Distinguish between facts, opinions, and uncertainties
+                - Highlight important caveats and limitations
+                """,
+                icon: "books.vertical",
+                isBuiltIn: true,
+                sortOrder: 5
+            )
+        ]
+    }
+
+    /// Seeds the built-in personas if they don't already exist.
+    /// - Parameter context: The SwiftData model context to insert personas into
+    static func seedDefaults(into context: ModelContext) {
+        for persona in defaultPersonas {
+            // Check if this persona already exists by name and isBuiltIn
+            // Note: We capture the name locally to use in the predicate
+            let name = persona.name
+            let descriptor = FetchDescriptor<Persona>(
+                predicate: #Predicate { $0.name == name && $0.isBuiltIn }
+            )
+
+            do {
+                let existing = try context.fetch(descriptor)
+                if existing.isEmpty {
+                    context.insert(persona)
+                }
+            } catch {
+                // If fetch fails, insert anyway
+                context.insert(persona)
+            }
+        }
     }
 }
