@@ -19,10 +19,10 @@ All Phase 0 tasks completed successfully:
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
 | TASK-1.1 | Implement SwiftData Models | core | TODO | — | CRUD ops, computed properties, cascade delete |
-| TASK-1.2 | Implement KeychainManager | core | TODO | — | save/read/delete/exists with iCloud Keychain sync |
+| TASK-1.2 | Implement KeychainManager | core | DONE | — | Full KeychainManager with KeychainError, iCloud sync, provider secrets convenience methods. Also fixed pre-existing build issues in Persona.swift, ProviderError.swift, HTTPClient.swift |
 | TASK-1.3 | Define AIProvider Protocol | core | TODO | — | Protocol + ChatMessage + StreamEvent types |
 | TASK-1.4 | Implement SSE Parser | core | DONE | — | Full SSE parser with AsyncThrowingStream, handles all SSE fields, [DONE] termination, multi-line data |
-| TASK-1.5 | Implement HTTPClient | core | TODO | — | URLSession wrapper with streaming support |
+| TASK-1.5 | Implement HTTPClient | core | DONE | — | URLSession wrapper with streaming, error mapping, ProviderError types. Also created NetworkError.swift and ProviderError.swift |
 | TASK-1.6 | Implement AnthropicAdapter | core | TODO | TASK-1.3, TASK-1.4, TASK-1.5 | Claude Messages API |
 | TASK-1.7 | Implement OpenAIAdapter | core | TODO | TASK-1.3, TASK-1.4, TASK-1.5 | Chat Completions API |
 | TASK-1.8 | Implement ProviderManager | core | TODO | TASK-1.6, TASK-1.7 | Registry, factory, selection |
@@ -43,6 +43,8 @@ All Phase 0 tasks completed successfully:
 
 ## Decisions Log
 
+- [2026-02-21] TASK-1.5 completed: HTTPClient.swift implemented as URLSession wrapper with streaming support. Provides stream() method for SSE/NDJSON via AsyncBytes, request() for standard HTTP. Automatic error mapping to ProviderError types (unauthorized, rateLimited, serverError, timeout, cancelled, networkError). Created ProviderError.swift as separate file with Equatable/Hashable conformance. Created NetworkError.swift for future network-specific errors. All types are Sendable for Swift 6 concurrency.
+- [2026-02-21] TASK-1.2 completed: KeychainManager.swift implemented with full CRUD operations. KeychainError enum covers all error cases. iCloud Keychain sync enabled via kSecAttrSynchronizable. Accessibility set to kSecAttrAccessibleAfterFirstUnlock. Convenience methods added for provider secrets (API keys, OAuth tokens). Also fixed pre-existing build issues in Persona.swift (predicate capture), ProviderError.swift (missing cases), and HTTPClient.swift (error handling).
 - [2026-02-21] TASK-1.4 completed: SSEParser.swift implemented with full SSE spec support. Parses data/event/id/retry fields, handles [DONE] termination, multi-line data, comments, empty line separators. Provides parseData() for raw Data output and parseEvents() for structured SSEEvent output. Includes decodeJSON() convenience method with Sendable constraint for Swift 6 compliance.
 - [2026-02-21] Project created. Architecture: SwiftUI + SwiftData + CloudKit
 - [2026-02-21] Dense Raycast-style UI confirmed
