@@ -7,6 +7,84 @@
 
 import SwiftUI
 
+// MARK: - Adaptive Color
+
+/// A color that adapts between light and dark mode.
+///
+/// Use this type for colors that need different values in light and dark appearances.
+/// This provides a cross-platform solution that works on iOS, macOS, and other Apple platforms.
+///
+/// ```swift
+/// let background = AdaptiveColor(light: .white, dark: .black)
+///
+/// // In a view:
+/// Rectangle()
+///     .fill(background)
+/// ```
+public struct AdaptiveColor: ShapeStyle, Sendable {
+    private let light: Color
+    private let dark: Color
+
+    /// Creates an adaptive color with light and dark variants.
+    /// - Parameters:
+    ///   - light: The color to use in light mode
+    ///   - dark: The color to use in dark mode
+    public init(light: Color, dark: Color) {
+        self.light = light
+        self.dark = dark
+    }
+
+    /// Resolves the color based on the current color scheme.
+    /// - Parameter colorScheme: The current color scheme
+    /// - Returns: The appropriate color for the current scheme
+    public func resolve(in colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? dark : light
+    }
+
+    public func resolve(in environment: EnvironmentValues) -> some ShapeStyle {
+        let colorScheme = environment.colorScheme
+        return colorScheme == .dark ? dark : light
+    }
+}
+
+// MARK: - Adaptive Color View Extension
+
+extension View {
+    /// Applies an adaptive color as a foreground style.
+    /// - Parameter adaptiveColor: The adaptive color to use
+    /// - Returns: A view with the adaptive foreground color applied
+    public func foregroundStyle(_ adaptiveColor: AdaptiveColor) -> some View {
+        self.modifier(AdaptiveColorModifier(adaptiveColor: adaptiveColor))
+    }
+
+    /// Applies an adaptive color as a background.
+    /// - Parameter adaptiveColor: The adaptive color to use
+    /// - Returns: A view with the adaptive background color applied
+    public func background(_ adaptiveColor: AdaptiveColor) -> some View {
+        self.modifier(AdaptiveBackgroundModifier(adaptiveColor: adaptiveColor))
+    }
+}
+
+/// View modifier that applies an adaptive foreground color.
+private struct AdaptiveColorModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    let adaptiveColor: AdaptiveColor
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(adaptiveColor.resolve(in: colorScheme))
+    }
+}
+
+/// View modifier that applies an adaptive background color.
+private struct AdaptiveBackgroundModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    let adaptiveColor: AdaptiveColor
+
+    func body(content: Content) -> some View {
+        content.background(adaptiveColor.resolve(in: colorScheme))
+    }
+}
+
 // MARK: - Theme
 
 /// Centralized design tokens for the OmniChat Raycast-inspired dense UI.
@@ -19,19 +97,19 @@ enum Theme {
         // MARK: Background Colors
 
         /// Primary background color for the app
-        static let background = Color(
+        static let background = AdaptiveColor(
             light: Color(hex: "FFFFFF"),
             dark: Color(hex: "1C1C1E")
         )
 
         /// Secondary background for cards, sidebars, and elevated surfaces
-        static let secondaryBackground = Color(
+        static let secondaryBackground = AdaptiveColor(
             light: Color(hex: "F2F2F7"),
             dark: Color(hex: "2C2C2E")
         )
 
         /// Tertiary background for nested elements
-        static let tertiaryBackground = Color(
+        static let tertiaryBackground = AdaptiveColor(
             light: Color(hex: "FFFFFF"),
             dark: Color(hex: "3A3A3C")
         )
@@ -39,24 +117,24 @@ enum Theme {
         // MARK: Text Colors
 
         /// Primary text color
-        static let text = Color(
+        static let text = AdaptiveColor(
             light: Color(hex: "000000"),
             dark: Color(hex: "FFFFFF")
         )
 
         /// Secondary text for subtitles and metadata
-        static let secondaryText = Color(
+        static let secondaryText = AdaptiveColor(
             light: Color(hex: "3C3C43").opacity(0.6),
             dark: Color(hex: "EBEBF5").opacity(0.6)
         )
 
         /// Tertiary text for subtle hints
-        static let tertiaryText = Color(
+        static let tertiaryText = AdaptiveColor(
             light: Color(hex: "3C3C43").opacity(0.3),
             dark: Color(hex: "EBEBF5").opacity(0.3)
         )
 
-        // MARK: Accent Colors
+        // MARK: Accent Colors (Static - same in light/dark)
 
         /// App accent color (blue)
         static let accent = Color(hex: "007AFF")
@@ -70,7 +148,7 @@ enum Theme {
         /// Warning color (orange)
         static let warning = Color(hex: "FF9500")
 
-        // MARK: Provider Accent Colors
+        // MARK: Provider Accent Colors (Static)
 
         /// Anthropic/Claude accent color (orange)
         static let anthropicAccent = Color(hex: "E87B35")
@@ -87,13 +165,13 @@ enum Theme {
         // MARK: Message Bubble Colors
 
         /// User message background
-        static let userMessageBackground = Color(
+        static let userMessageBackground = AdaptiveColor(
             light: Color(hex: "007AFF"),
             dark: Color(hex: "007AFF")
         )
 
         /// Assistant message background
-        static let assistantMessageBackground = Color(
+        static let assistantMessageBackground = AdaptiveColor(
             light: Color(hex: "F2F2F7"),
             dark: Color(hex: "2C2C2E")
         )
@@ -101,13 +179,13 @@ enum Theme {
         // MARK: Code Block Colors
 
         /// Code block background
-        static let codeBackground = Color(
+        static let codeBackground = AdaptiveColor(
             light: Color(hex: "F5F5F7"),
             dark: Color(hex: "1E1E1E")
         )
 
         /// Inline code background
-        static let inlineCodeBackground = Color(
+        static let inlineCodeBackground = AdaptiveColor(
             light: Color(hex: "E8E8ED"),
             dark: Color(hex: "2D2D2D")
         )
@@ -115,13 +193,13 @@ enum Theme {
         // MARK: Border Colors
 
         /// Standard border color
-        static let border = Color(
+        static let border = AdaptiveColor(
             light: Color(hex: "C6C6C8"),
             dark: Color(hex: "38383A")
         )
 
         /// Subtle separator color
-        static let separator = Color(
+        static let separator = AdaptiveColor(
             light: Color(hex: "C6C6C8").opacity(0.5),
             dark: Color(hex: "38383A").opacity(0.5)
         )
@@ -251,27 +329,6 @@ private extension Color {
             opacity: Double(a) / 255
         )
     }
-
-    /// Creates an adaptive Color for light and dark mode.
-    /// - Parameters:
-    ///   - light: The color to use in light mode
-    ///   - dark: The color to use in dark mode
-    init(light: Color, dark: Color) {
-        #if os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
-        self.init(uiColor: UIColor { traitCollection in
-            switch traitCollection.userInterfaceStyle {
-            case .dark:
-                return UIColor(dark)
-            default:
-                return UIColor(light)
-            }
-        })
-        #else
-        // On macOS and other platforms, use a simple approach
-        // The Color will automatically adapt if using asset catalog colors
-        self.init(light)
-        #endif
-    }
 }
 
 // MARK: - Preview
@@ -317,6 +374,19 @@ private extension Color {
                     CornerRadiusPreview(radius: .small, name: "Small (4pt)")
                     CornerRadiusPreview(radius: .medium, name: "Medium (8pt)")
                     CornerRadiusPreview(radius: .large, name: "Large (12pt)")
+                }
+            }
+
+            Divider()
+
+            Group {
+                Text("Adaptive Colors (toggle dark mode to see)")
+                    .font(Theme.Typography.headline)
+
+                HStack(spacing: Theme.Spacing.medium.rawValue) {
+                    AdaptiveColorPreview(adaptiveColor: Theme.Colors.background, name: "Background")
+                    AdaptiveColorPreview(adaptiveColor: Theme.Colors.text, name: "Text")
+                    AdaptiveColorPreview(adaptiveColor: Theme.Colors.border, name: "Border")
                 }
             }
         }
@@ -374,6 +444,26 @@ private struct CornerRadiusPreview: View {
                 .stroke(Theme.Colors.accent, lineWidth: 2)
                 .frame(width: 50, height: 50)
 
+            Text(name)
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Colors.secondaryText)
+        }
+    }
+}
+
+private struct AdaptiveColorPreview: View {
+    let adaptiveColor: AdaptiveColor
+    let name: String
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.extraSmall.rawValue) {
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.small.rawValue)
+                .fill(adaptiveColor)
+                .frame(width: 40, height: 40)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.small.rawValue)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
             Text(name)
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Colors.secondaryText)
