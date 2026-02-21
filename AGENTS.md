@@ -28,6 +28,10 @@
 - [2026-02-21] SwiftData models pre-created: Conversation, Message, Attachment, ProviderConfig, Persona, UsageRecord
 - [2026-02-21] SwiftData models verified: Build succeeds on both iOS and macOS. Cross-file @Relationship references work correctly (Conversation -> Message -> Attachment chain)
 - [2026-02-21] AppState uses @MainActor for Swift 6 strict concurrency compliance
+- [2026-02-21] project.yml fixed: Multiplatform targets now build correctly (OmniChat_iOS, OmniChat_macOS)
+- [2026-02-21] Test targets configured with GENERATE_INFOPLIST_FILE for proper code signing
+- [2026-02-21] Available schemes: OmniChat, OmniChat_macOS, OmniChatTests
+- [2026-02-21] Build commands: Use `OmniChat` scheme for iOS Simulator, `OmniChat_macOS` scheme for macOS
 
 ## Integration Notes
 

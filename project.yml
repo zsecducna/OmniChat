@@ -82,6 +82,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.yourname.omnichat.tests
         # Enable both Swift Testing and XCTest
         CLANG_ENABLE_MODULES: YES
+        GENERATE_INFOPLIST_FILE: YES
 
   OmniChatUITests:
     type: bundle.ui-testing
@@ -96,6 +97,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yourname.omnichat.uitests
+        GENERATE_INFOPLIST_FILE: YES
 
 schemes:
   OmniChat:
