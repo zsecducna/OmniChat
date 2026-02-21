@@ -32,6 +32,9 @@ struct ChatView: View {
     /// The conversation being displayed.
     @Bindable var conversation: Conversation
 
+    /// The provider manager for accessing AI providers.
+    @State private var providerManager: ProviderManager?
+
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
@@ -43,7 +46,6 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var isStreaming = false
     @State private var isLoadingOlder = false
-    @State private var showModelSwitcher = false
 
     // MARK: - Constants
 
@@ -66,13 +68,41 @@ struct ChatView: View {
 
     /// The current model display name.
     private var modelDisplayName: String {
-        conversation.modelID ?? "Claude Sonnet 4.5"
+        guard let manager = providerManager else {
+            return conversation.modelID ?? "Select Model"
+        }
+
+        if let modelID = conversation.modelID,
+           let providerID = conversation.providerConfigID,
+           let provider = manager.provider(for: providerID),
+           let model = provider.availableModels.first(where: { $0.id == modelID }) {
+            return model.displayName
+        }
+
+        if let provider = currentProvider,
+           let defaultModel = provider.defaultModel {
+            return defaultModel.displayName
+        }
+
+        return conversation.modelID ?? "Select Model"
     }
 
     /// Provider accent color based on conversation's provider.
     private var providerColor: Color {
-        // TODO: Get actual provider type from conversation.providerConfigID
-        Theme.Colors.anthropicAccent
+        guard let provider = currentProvider else {
+            return Theme.Colors.customAccent
+        }
+        return Theme.Colors.accentColor(for: provider.providerType.rawValue)
+    }
+
+    /// The current provider configuration.
+    private var currentProvider: ProviderConfig? {
+        guard let manager = providerManager else { return nil }
+
+        if let providerID = conversation.providerConfigID {
+            return manager.provider(for: providerID)
+        }
+        return manager.defaultProvider
     }
 
     // MARK: - Body
@@ -82,7 +112,7 @@ struct ChatView: View {
             // Message list
             messageListView
 
-            // Input bar (placeholder for now - will be implemented in TASK-2.5)
+            // Input bar
             inputBarView
         }
         .navigationTitle(conversation.title)
@@ -92,43 +122,11 @@ struct ChatView: View {
         .toolbar {
             toolbarContent
         }
-        .sheet(isPresented: $showModelSwitcher) {
-            // Model switcher sheet placeholder - will be implemented in Phase 4
-            NavigationStack {
-                List {
-                    Section("Current Model") {
-                        HStack {
-                            Circle()
-                                .fill(providerColor)
-                                .frame(width: 8, height: 8)
-                            Text(modelDisplayName)
-                            Spacer()
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(Theme.Colors.accent)
-                        }
-                    }
-
-                    Section("Available Models") {
-                        Text("Model switcher will be implemented in Phase 4")
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(Theme.Colors.secondaryText)
-                    }
-                }
-                .navigationTitle("Switch Model")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            showModelSwitcher = false
-                        }
-                    }
-                }
+        .task {
+            // Initialize provider manager if not already set
+            if providerManager == nil {
+                providerManager = ProviderManager(modelContext: modelContext)
             }
-            #if os(iOS)
-            .presentationDetents([.medium, .large])
-            #endif
         }
     }
 
@@ -290,27 +288,35 @@ struct ChatView: View {
 
     // MARK: - Model Pill View
 
+    @ViewBuilder
     private var modelPillView: some View {
-        Button {
-            showModelSwitcher = true
-        } label: {
-            HStack(spacing: Theme.Spacing.tight.rawValue) {
-                Circle()
-                    .fill(providerColor)
-                    .frame(width: 6, height: 6)
-
-                Text(modelDisplayName)
-                    .font(Theme.Typography.caption)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, Theme.Spacing.small.rawValue)
-            .padding(.vertical, Theme.Spacing.tight.rawValue)
-            .background(
-                Capsule()
-                    .fill(Theme.Colors.tertiaryBackground)
+        if let manager = providerManager {
+            CompactModelSwitcher(
+                selectedProviderID: $conversation.providerConfigID,
+                selectedModelID: $conversation.modelID,
+                providerManager: manager
             )
+        } else {
+            // Fallback placeholder while loading
+            Button {} label: {
+                HStack(spacing: Theme.Spacing.tight.rawValue) {
+                    Circle()
+                        .fill(Theme.Colors.customAccent)
+                        .frame(width: 6, height: 6)
+                    Text("Loading...")
+                        .font(Theme.Typography.caption)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, Theme.Spacing.small.rawValue)
+                .padding(.vertical, Theme.Spacing.tight.rawValue)
+                .background(
+                    Capsule()
+                        .fill(Theme.Colors.tertiaryBackground)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(true)
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Toolbar
@@ -319,24 +325,32 @@ struct ChatView: View {
     private var toolbarContent: some ToolbarContent {
         // Model switcher pill in toolbar
         ToolbarItem(placement: .primaryAction) {
-            Button {
-                showModelSwitcher = true
-            } label: {
-                HStack(spacing: Theme.Spacing.tight.rawValue) {
-                    Circle()
-                        .fill(providerColor)
-                        .frame(width: 8, height: 8)
-                    Text(modelDisplayName)
-                        .font(Theme.Typography.caption)
-                }
-                .padding(.horizontal, Theme.Spacing.small.rawValue)
-                .padding(.vertical, Theme.Spacing.tight.rawValue)
-                .background(
-                    Capsule()
-                        .fill(Theme.Colors.secondaryBackground)
+            if let manager = providerManager {
+                ModelSwitcher(
+                    selectedProviderID: $conversation.providerConfigID,
+                    selectedModelID: $conversation.modelID,
+                    providerManager: manager
                 )
+            } else {
+                // Fallback placeholder while loading
+                Button {} label: {
+                    HStack(spacing: Theme.Spacing.tight.rawValue) {
+                        Circle()
+                            .fill(Theme.Colors.customAccent)
+                            .frame(width: 8, height: 8)
+                        Text("Loading...")
+                            .font(Theme.Typography.caption)
+                    }
+                    .padding(.horizontal, Theme.Spacing.small.rawValue)
+                    .padding(.vertical, Theme.Spacing.tight.rawValue)
+                    .background(
+                        Capsule()
+                            .fill(Theme.Colors.secondaryBackground)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(true)
             }
-            .buttonStyle(.plain)
         }
 
         #if os(macOS)

@@ -17,6 +17,7 @@
 		0A15E92FB80DA78D662E3B79 /* Persona.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FF80BD25EA364923296841C /* Persona.swift */; };
 		0E302252BD1C5FFFD99C8F62 /* SSEParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DE3D8ACE05C6EE17C123D5 /* SSEParser.swift */; };
 		0EBF65532C7B063F6CFB9E3D /* DataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40617951D14503F69903872 /* DataManager.swift */; };
+		122EB483BE3A841D879CE359 /* ModelSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED3BECD66A37DB7997F684E /* ModelSwitcher.swift */; };
 		12BE329F919D5CE84B391E90 /* OmniChatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F873701B6E0AD3963FA77BF2 /* OmniChatUITests.swift */; };
 		139FF82824869ED01E518410 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B3849A5E5CA8FF5DAF75689 /* Theme.swift */; };
 		153934A72C8A7545D66DBDAD /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08101B0E2EC8D7AE97637EDF /* KeychainManager.swift */; };
@@ -46,6 +47,7 @@
 		44F89A209C33CDC2C8EFB587 /* OmniChatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD38DA76F1B4911D2EF4F533 /* OmniChatTests.swift */; };
 		45D7D5B27AF2F81FAB0E5198 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F41C5B0504027C80C06D99 /* ConversationListView.swift */; };
 		47DE4ADD7D919421E361753B /* ProviderError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4505B26602D037932773181 /* ProviderError.swift */; };
+		481D28521267929BF2C77665 /* ModelSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED3BECD66A37DB7997F684E /* ModelSwitcher.swift */; };
 		4844A0BA7FC09C500661E991 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA5E3BEEAD5B18A19C188E9 /* Message.swift */; };
 		4D636D5FB208623E598DC3ED /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A55B5DC7624CF6BDA5A76A /* String+Extensions.swift */; };
 		4DCE89894B6AC8B17C5A8E8A /* OAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31F4406D47EF5E212CBBFBE /* OAuthManager.swift */; };
@@ -213,6 +215,7 @@
 		A863E4ADB042F2943DBB8664 /* KeyboardShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcuts.swift; sourceTree = "<group>"; };
 		AA14AEAC731323F04CE6017E /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		ACA5E3BEEAD5B18A19C188E9 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
+		AED3BECD66A37DB7997F684E /* ModelSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSwitcher.swift; sourceTree = "<group>"; };
 		B4505B26602D037932773181 /* ProviderError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderError.swift; sourceTree = "<group>"; };
 		B4AE4410488FBEA75EC642DE /* AttachmentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPicker.swift; sourceTree = "<group>"; };
 		B529ACE71FA0245354906E85 /* SearchableConversationList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchableConversationList.swift; sourceTree = "<group>"; };
@@ -477,6 +480,7 @@
 				B4AE4410488FBEA75EC642DE /* AttachmentPicker.swift */,
 				C3B2ECB2203EE9195218E987 /* CodeBlockView.swift */,
 				6481460227F95C1D6F445EC0 /* MarkdownRenderer.swift */,
+				AED3BECD66A37DB7997F684E /* ModelSwitcher.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -872,6 +876,7 @@
 				DFEA0CF5847810AB80304C75 /* MessageInputBar.swift in Sources */,
 				AB3D951A6D2A194EF8A9EF47 /* MessageStore.swift in Sources */,
 				8D36A36041C2467877933DAD /* MigrationPlan.swift in Sources */,
+				122EB483BE3A841D879CE359 /* ModelSwitcher.swift in Sources */,
 				B00DC4F1B8E1742D9DF5D155 /* NetworkError.swift in Sources */,
 				BB17CEB200A22A78A66EA18D /* OAuthConfig.swift in Sources */,
 				4DCE89894B6AC8B17C5A8E8A /* OAuthManager.swift in Sources */,
@@ -946,6 +951,7 @@
 				786F51C8CF8F8B8DD45A3B11 /* MessageInputBar.swift in Sources */,
 				74A4A02C19744471CDCC1EA9 /* MessageStore.swift in Sources */,
 				BD5ECAD0C946DB718A333D9B /* MigrationPlan.swift in Sources */,
+				481D28521267929BF2C77665 /* ModelSwitcher.swift in Sources */,
 				C5F68D6703D62595B08261AF /* NetworkError.swift in Sources */,
 				D2FA9ACE8B84C6F5FEE79EA7 /* OAuthConfig.swift in Sources */,
 				BC5E2437471BE5E37FBF4EEF /* OAuthManager.swift in Sources */,
