@@ -158,6 +158,21 @@ final class ChatViewModel {
         messages.contains { $0.role == .user }
     }
 
+    /// The currently active persona for the conversation, if any.
+    ///
+    /// Returns the Persona if:
+    /// 1. The conversation has a personaID set
+    /// 2. The Persona still exists (hasn't been deleted)
+    ///
+    /// Returns nil if no persona is set or the persona was deleted.
+    var activePersona: Persona? {
+        guard let conversation = currentConversation,
+              let personaID = conversation.personaID else {
+            return nil
+        }
+        return fetchPersona(id: personaID)
+    }
+
     // MARK: - Actions
 
     /// Sends a message and generates an AI response.
@@ -209,7 +224,8 @@ final class ChatViewModel {
 
         // Capture values needed for streaming
         let modelID = effectiveModelID
-        let systemPrompt = conversation.systemPrompt
+        // Resolve system prompt from persona or conversation's direct systemPrompt
+        let systemPrompt = resolveSystemPrompt()
 
         // Start streaming
         isStreaming = true
@@ -408,6 +424,62 @@ final class ChatViewModel {
     }
 
     // MARK: - Private Methods
+
+    /// Resolves the system prompt for the current conversation.
+    ///
+    /// Priority order:
+    /// 1. If conversation has a personaID, fetch the Persona and use its systemPrompt
+    /// 2. If persona is not found (deleted), fall back to conversation's systemPrompt
+    /// 3. If neither is set, return nil
+    ///
+    /// - Returns: The system prompt to use, or nil if none is configured.
+    private func resolveSystemPrompt() -> String? {
+        guard let conversation = currentConversation else { return nil }
+
+        // If conversation has a personaID, try to fetch the persona
+        if let personaID = conversation.personaID {
+            if let persona = fetchPersona(id: personaID) {
+                // Use persona's system prompt (may be empty for "Default" persona)
+                let prompt = persona.systemPrompt
+                if !prompt.isEmpty {
+                    Self.logger.debug("Using system prompt from persona: \(persona.name)")
+                    return prompt
+                } else {
+                    Self.logger.debug("Persona '\(persona.name)' has empty system prompt, skipping")
+                    return nil
+                }
+            } else {
+                // Persona was deleted, fall back to conversation's systemPrompt
+                Self.logger.warning("Persona with ID \(personaID) not found, falling back to conversation system prompt")
+            }
+        }
+
+        // Use conversation's direct system prompt if set
+        if let systemPrompt = conversation.systemPrompt, !systemPrompt.isEmpty {
+            Self.logger.debug("Using conversation's direct system prompt")
+            return systemPrompt
+        }
+
+        return nil
+    }
+
+    /// Fetches a Persona by ID from SwiftData.
+    ///
+    /// - Parameter id: The UUID of the persona to fetch.
+    /// - Returns: The Persona if found, nil otherwise.
+    private func fetchPersona(id: UUID) -> Persona? {
+        let descriptor = FetchDescriptor<Persona>(
+            predicate: #Predicate { $0.id == id }
+        )
+
+        do {
+            let personas = try modelContext.fetch(descriptor)
+            return personas.first
+        } catch {
+            Self.logger.error("Failed to fetch persona: \(error.localizedDescription)")
+            return nil
+        }
+    }
 
     /// Builds the array of ChatMessage for the API request.
     ///
