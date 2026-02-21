@@ -11,6 +11,15 @@
 
 ## Task Status
 
+### Phase 3 Tasks
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-3.1 | Implement SettingsView | ui | DONE | — | Root settings view with platform-adaptive layout. iOS: NavigationStack with List sections (Providers, Defaults, Personas, Usage, About). macOS: NavigationSplitView with sidebar selection. Fixed platform-specific build errors: `.insetGrouped` list style for iOS only, `@Environment(\.editMode)` for iOS only. Both iOS and macOS builds succeed. |
+| TASK-3.2 | Implement ProviderListView | ui | DONE | — | List of configured providers with swipe actions, reorder, add/edit/delete. Platform-adaptive list style. |
+| TASK-3.3 | Implement ProviderSetupView | ui | DONE | — | Multi-step wizard for provider configuration: Type → Auth → Model → Advanced. API key validation, model fetching. |
+| TASK-3.4 | Implement DefaultsSettingsView | ui | DONE | — | Default provider/model picker, temperature slider, max tokens picker, persona picker. Uses @AppStorage for persistence. |
+
 ### Phase 2 Tasks
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
@@ -52,6 +61,7 @@
 
 ## Decisions Log
 
+- [2026-02-22] TASK-3.1 completed: SettingsView implemented as root settings screen with platform-adaptive layout. Features: (1) iOS uses NavigationStack with List sections for Providers, Defaults, Personas, Usage, About; (2) macOS uses NavigationSplitView with sidebar selection and detail view; (3) UsageDashboardView placeholder for Phase 8; (4) About section with app version and links. Fixed platform-specific build errors: `.insetGrouped` list style only available on iOS, `@Environment(\.editMode)` only available on iOS. Both iOS and macOS builds succeed.
 - [2026-02-22] PHASE 2 COMPLETE: All 7 Phase 2 tasks completed. Chat UI Foundation is fully implemented with ContentView (root navigation), ConversationListView (sidebar with search/swipe actions), ChatView (main chat with auto-scroll, model switcher), MessageBubble (user/assistant styling), MessageInputBar (multi-line input with keyboard shortcuts), ChatViewModel (streaming orchestration), and StreamingTextView (real-time token rendering). The app now has a complete, functional chat interface ready for Phase 3 (Settings & Provider Management).
 - [2026-02-22] TASK-2.7 completed: StreamingTextView implemented in Features/Chat/Views/StreamingTextView.swift. Real-time token-by-token rendering for AI streaming responses. Key features: (1) Displays streaming text as tokens arrive; (2) Blinking cursor using Unicode U+250C at 530ms interval; (3) "Thinking..." italic placeholder when text is empty but streaming; (4) "Generating..." status indicator with small ProgressView; (5) Provider badge with Theme.Colors.accentColor(for:) lookup (anthropic/openai/ollama/custom); (6) Optional showStatus parameter for compact mode; (7) Proper Task management with cancellation on onDisappear and onChange(of: isStreaming); (8) @ViewBuilder text content using Text concatenation (+) for cursor; (9) Convenience initializer accepting providerConfigID. Both iOS and macOS builds succeed.
 - [2026-02-22] TASK-2.6 completed: ChatViewModel implemented in Features/Chat/ViewModels/ChatViewModel.swift. @MainActor @Observable class orchestrating all chat operations. Key features: (1) sendMessage() method handles full message lifecycle - creates user Message, builds ChatMessage array from conversation history, starts streaming via AIProvider's AsyncThrowingStream, accumulates streamingText in real-time, creates assistant Message with token counts and duration; (2) Uses private StreamingResult struct to safely pass streaming results (inputTokens, outputTokens, responseModel, finalText, error) across Task boundaries in Swift 6 strict concurrency; (3) stopGeneration() cancels both Task and provider's cancel() for immediate stop; (4) retryLastMessage() finds last user message, deletes last assistant message, resends; (5) switchModel() and switchProvider() for mid-conversation changes; (6) Automatic usage recording via UsageRecord with cost calculation; (7) currentProvider computed property resolves from conversation's providerConfigID or falls back to default; (8) buildChatMessages() converts SwiftData Message objects to Sendable ChatMessage types with attachment payloads. Both iOS and macOS builds succeed.
