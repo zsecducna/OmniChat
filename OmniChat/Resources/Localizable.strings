@@ -1,0 +1,48 @@
+/*
+  Localizable.strings
+  OmniChat
+
+  Localized strings for the application.
+*/
+
+// General
+"app.name" = "OmniChat";
+"app.tagline" = "Universal AI Chat";
+
+// Navigation
+"navigation.chats" = "Chats";
+"navigation.settings" = "Settings";
+"navigation.providers" = "Providers";
+"navigation.personas" = "Personas";
+
+// Chat
+"chat.new" = "New Chat";
+"chat.placeholder" = "Message %@...";
+"chat.send" = "Send";
+"chat.stop" = "Stop Generating";
+"chat.retry" = "Retry";
+
+// Provider
+"provider.add" = "Add Provider";
+"provider.edit" = "Edit Provider";
+"provider.delete" = "Delete Provider";
+"provider.validate" = "Validate";
+"provider.validated" = "Validated";
+
+// Persona
+"persona.default" = "Default";
+"persona.code_assistant" = "Code Assistant";
+"persona.writing_editor" = "Writing Editor";
+"persona.translator" = "Translator";
+"persona.summarizer" = "Summarizer";
+
+// Settings
+"settings.defaults" = "Defaults";
+"settings.usage" = "Usage & Costs";
+"settings.appearance" = "Appearance";
+"settings.about" = "About";
+
+// Errors
+"error.network" = "Network error. Please check your connection.";
+"error.provider" = "Provider error. Please check your configuration.";
+"error.unknown" = "An unknown error occurred.";

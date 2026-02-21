@@ -10,6 +10,22 @@ import SwiftData
 
 @main
 struct OmniChatApp: App {
+    /// The SwiftData model container configured with CloudKit integration.
+    ///
+    /// This container is created via `DataManager.createModelContainer()` which
+    /// sets up iCloud sync for all model types. If initialization fails, the app
+    /// will terminate with an appropriate error message.
+    private let modelContainer: ModelContainer
+
+    init() {
+        do {
+            modelContainer = try DataManager.createModelContainer()
+        } catch {
+            // In production, we cannot recover from a failed container initialization
+            fatalError("Failed to initialize SwiftData ModelContainer: \(error)")
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -19,11 +35,11 @@ struct OmniChatApp: App {
             // macOS-specific commands will be added here
         }
         #endif
-        .modelContainer(for: [Conversation.self, Message.self, ProviderConfig.self, Persona.self, Attachment.self, UsageRecord.self])
+        .modelContainer(modelContainer)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Conversation.self, Message.self], inMemory: true)
+        .modelContainer(DataManager.createPreviewContainer())
 }
