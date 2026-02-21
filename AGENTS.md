@@ -10,7 +10,7 @@
 | TASK-0.2 | Configure Swift Package dependencies | devops | TODO | — | swift-markdown, Splash |
 | TASK-0.3 | Create full directory structure | devops | TODO | — | Match MASTER_PLAN.md Section 3 |
 | TASK-0.4 | Configure SwiftData container | core | TODO | — | CloudKit integration |
-| TASK-0.5 | Design system foundation (Theme.swift) | ui | TODO | — | Raycast-inspired tokens |
+| TASK-0.5 | Design system foundation (Theme.swift) | ui | DONE | — | Created Theme.swift with colors, typography, spacing, corner radii. Created DenseLayout.swift with dense spacing modifiers and containers. Raycast-inspired dense design. |
 
 ## Blockers
 
@@ -32,6 +32,7 @@
 - [2026-02-21] Test targets configured with GENERATE_INFOPLIST_FILE for proper code signing
 - [2026-02-21] Available schemes: OmniChat, OmniChat_macOS, OmniChatTests
 - [2026-02-21] Build commands: Use `OmniChat` scheme for iOS Simulator, `OmniChat_macOS` scheme for macOS
+- [2026-02-21] TASK-0.5 completed: Design system foundation created (Theme.swift + DenseLayout.swift). Raycast-inspired dense UI with 2-16pt spacing scale, provider accent colors, SF Pro/Mono typography.
 
 ## Integration Notes
 
