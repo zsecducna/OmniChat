@@ -4,6 +4,7 @@
 //
 //  Main chat interface view.
 //  Displays conversation messages with streaming support.
+//  Raycast-inspired dense UI with keyboard-first design.
 //
 
 import SwiftUI
@@ -12,52 +13,66 @@ import SwiftData
 /// Main chat interface displaying a conversation's messages.
 ///
 /// This view shows:
-/// - A scrollable list of messages in the conversation
+/// - A scrollable list of messages in the conversation using LazyVStack for performance
 /// - An input bar at the bottom for composing new messages
 /// - Toolbar items for model switching and conversation settings
 ///
-/// The view observes the conversation's messages via `@Query` and updates
+/// ## Features
+/// - Auto-scroll to bottom on new messages
+/// - Empty state: "Send a message to start"
+/// - Dense spacing: 4-6pt between messages (Raycast-style)
+/// - Toolbar with model switcher pill and provider badge
+/// - Streaming indicator during AI response generation
+///
+/// The view observes the conversation's messages via SwiftData relationship and updates
 /// automatically when new messages are added (including during streaming).
 struct ChatView: View {
     // MARK: - Properties
 
     /// The conversation being displayed.
-    let conversation: Conversation
+    @Bindable var conversation: Conversation
 
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-
-    // MARK: - SwiftData Query
-
-    /// Messages for this conversation, sorted by creation date.
-    @Query(
-        filter: #Predicate<Message> { _ in true }, // Will be refined with macro
-        sort: \Message.createdAt,
-        order: .forward,
-        animation: .default
-    ) private var allMessages: [Message]
+    @Environment(\.dismiss) private var dismiss
 
     // MARK: - State
 
     @State private var inputText = ""
     @State private var isStreaming = false
+    @State private var isLoadingOlder = false
+    @State private var showModelSwitcher = false
+
+    // MARK: - Constants
+
+    /// Dense spacing between messages (Raycast-style: 4-6pt)
+    private let messageSpacing: CGFloat = 4
 
     // MARK: - Computed Properties
 
-    /// Messages filtered to this conversation.
+    /// Messages sorted by creation date.
     private var messages: [Message] {
-        allMessages.filter { $0.conversation?.id == conversation.id }
+        conversation.messages.sorted { $0.createdAt < $1.createdAt }
     }
 
     /// Color for the send button based on input state.
     private var sendButtonColor: Color {
-        if inputText.isEmpty {
-            return Theme.Colors.tertiaryText.resolve(in: colorScheme)
-        } else {
-            return Theme.Colors.accent
-        }
+        inputText.isEmpty
+            ? Theme.Colors.tertiaryText.resolve(in: colorScheme)
+            : Theme.Colors.accent
+    }
+
+    /// The current model display name.
+    private var modelDisplayName: String {
+        conversation.modelID ?? "Claude Sonnet 4.5"
+    }
+
+    /// Provider accent color based on conversation's provider.
+    private var providerColor: Color {
+        // TODO: Get actual provider type from conversation.providerConfigID
+        Theme.Colors.anthropicAccent
     }
 
     // MARK: - Body
@@ -68,7 +83,7 @@ struct ChatView: View {
             messageListView
 
             // Input bar (placeholder for now - will be implemented in TASK-2.5)
-            inputBarPlaceholder
+            inputBarView
         }
         .navigationTitle(conversation.title)
         #if os(iOS)
@@ -77,6 +92,44 @@ struct ChatView: View {
         .toolbar {
             toolbarContent
         }
+        .sheet(isPresented: $showModelSwitcher) {
+            // Model switcher sheet placeholder - will be implemented in Phase 4
+            NavigationStack {
+                List {
+                    Section("Current Model") {
+                        HStack {
+                            Circle()
+                                .fill(providerColor)
+                                .frame(width: 8, height: 8)
+                            Text(modelDisplayName)
+                            Spacer()
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(Theme.Colors.accent)
+                        }
+                    }
+
+                    Section("Available Models") {
+                        Text("Model switcher will be implemented in Phase 4")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
+                }
+                .navigationTitle("Switch Model")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            showModelSwitcher = false
+                        }
+                    }
+                }
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            #endif
+        }
     }
 
     // MARK: - Message List View
@@ -84,22 +137,44 @@ struct ChatView: View {
     private var messageListView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: Theme.Spacing.small.rawValue) {
+                LazyVStack(spacing: messageSpacing) {
+                    // Load older messages trigger (for pagination support)
+                    if messages.count >= 50 {
+                        loadOlderTrigger
+                    }
+
                     ForEach(messages) { message in
                         MessageBubble(message: message)
                             .id(message.id)
                     }
 
-                    // Streaming indicator placeholder
+                    // Streaming indicator
                     if isStreaming {
                         streamingIndicator
+                            .id("streaming")
                     }
+
+                    // Scroll anchor at bottom
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom")
                 }
                 .padding(.horizontal, Theme.Spacing.medium.rawValue)
                 .padding(.vertical, Theme.Spacing.small.rawValue)
             }
-            .onChange(of: messages.count) { _, _ in
-                scrollToBottom(proxy: proxy)
+            .onChange(of: messages.count) { oldValue, newValue in
+                // Auto-scroll to bottom on new messages
+                if newValue > oldValue {
+                    scrollToBottom(proxy: proxy)
+                }
+            }
+            .onChange(of: isStreaming) { _, streaming in
+                // Scroll to streaming indicator when streaming starts
+                if streaming {
+                    withAnimation(.easeInOut(duration: Theme.Animation.default)) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
             }
         }
         .background(Theme.Colors.background)
@@ -110,89 +185,206 @@ struct ChatView: View {
         }
     }
 
+    // MARK: - Load Older Trigger
+
+    private var loadOlderTrigger: some View {
+        ProgressView()
+            .scaleEffect(0.6)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.small.rawValue)
+            .onAppear {
+                // TODO: Implement pagination in Phase 4
+                // This is a placeholder for pull-to-load-older functionality
+                isLoadingOlder = true
+                Task {
+                    // Simulate loading delay
+                    try? await Task.sleep(for: .milliseconds(500))
+                    isLoadingOlder = false
+                }
+            }
+    }
+
     // MARK: - Empty State
 
     private var emptyStateView: some View {
         ContentUnavailableView {
-            Label("No Messages", systemImage: "bubble.left.and.bubble.right")
+            Label("Start a Conversation", systemImage: "bubble.left.and.bubble.right")
         } description: {
-            Text("Send a message to start the conversation")
+            Text("Send a message to begin chatting")
+        } actions: {
+            Button {
+                // Focus input - will be connected in TASK-2.5
+            } label: {
+                Text("Send a message")
+                    .font(Theme.Typography.body)
+            }
+            .buttonStyle(.borderedProminent)
         }
+        .offset(y: -40) // Shift up slightly for better visual balance
     }
 
     // MARK: - Streaming Indicator
 
     private var streamingIndicator: some View {
         HStack(spacing: Theme.Spacing.extraSmall.rawValue) {
-            ProgressView()
-                .scaleEffect(0.7)
-            Text("Generating...")
-                .font(Theme.Typography.caption)
-                .foregroundStyle(Theme.Colors.secondaryText)
+            // Animated typing dots
+            TypingIndicator()
         }
-        .padding(Theme.Spacing.small.rawValue)
+        .padding(Theme.Spacing.medium.rawValue)
         .background(Theme.Colors.assistantMessageBackground)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Input Bar Placeholder
+    // MARK: - Input Bar View
 
-    private var inputBarPlaceholder: some View {
-        HStack(spacing: Theme.Spacing.medium.rawValue) {
-            TextField("Message...", text: $inputText)
-                .textFieldStyle(.plain)
-                .font(Theme.Typography.body)
-                .padding(Theme.Spacing.medium.rawValue)
-                .background(Theme.Colors.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
-                .onSubmit {
-                    sendMessage()
-                }
+    private var inputBarView: some View {
+        HStack(alignment: .bottom, spacing: Theme.Spacing.medium.rawValue) {
+            // Attachment button (placeholder)
+            Button {
+                // TODO: Implement attachment picker in TASK-2.5
+            } label: {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Theme.Colors.tertiaryText)
+            }
+            .buttonStyle(.plain)
+            .disabled(isStreaming)
 
+            // Text input
+            HStack(alignment: .bottom, spacing: Theme.Spacing.small.rawValue) {
+                TextField(getPlaceholderText(), text: $inputText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(Theme.Typography.body)
+                    .lineLimit(1...6)
+                    .disabled(isStreaming)
+                    .onSubmit {
+                        #if os(macOS)
+                        // On macOS, Enter sends, Shift+Enter adds newline
+                        sendMessage()
+                        #endif
+                    }
+
+                // Model/Provider pill indicator
+                modelPillView
+            }
+            .padding(.horizontal, Theme.Spacing.medium.rawValue)
+            .padding(.vertical, Theme.Spacing.small.rawValue)
+            .background(Theme.Colors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
+
+            // Send button
             Button(action: sendMessage) {
                 Image(systemName: "paperplane.fill")
                     .font(.system(size: 16))
                     .foregroundStyle(sendButtonColor)
             }
             .buttonStyle(.plain)
-            .disabled(inputText.isEmpty)
+            .disabled(inputText.isEmpty || isStreaming)
+            .keyboardShortcut(.defaultAction) // Cmd+Enter on Mac
         }
-        .padding(Theme.Spacing.medium.rawValue)
+        .padding(.horizontal, Theme.Spacing.medium.rawValue)
+        .padding(.vertical, Theme.Spacing.small.rawValue)
         .background(Theme.Colors.secondaryBackground)
+    }
+
+    // MARK: - Model Pill View
+
+    private var modelPillView: some View {
+        Button {
+            showModelSwitcher = true
+        } label: {
+            HStack(spacing: Theme.Spacing.tight.rawValue) {
+                Circle()
+                    .fill(providerColor)
+                    .frame(width: 6, height: 6)
+
+                Text(modelDisplayName)
+                    .font(Theme.Typography.caption)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, Theme.Spacing.small.rawValue)
+            .padding(.vertical, Theme.Spacing.tight.rawValue)
+            .background(
+                Capsule()
+                    .fill(Theme.Colors.tertiaryBackground)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Toolbar
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        // Model switcher pill in toolbar
         ToolbarItem(placement: .primaryAction) {
             Button {
-                // Model switcher will be implemented in Phase 4
+                showModelSwitcher = true
             } label: {
-                Label("Switch Model", systemImage: "cpu")
+                HStack(spacing: Theme.Spacing.tight.rawValue) {
+                    Circle()
+                        .fill(providerColor)
+                        .frame(width: 8, height: 8)
+                    Text(modelDisplayName)
+                        .font(Theme.Typography.caption)
+                }
+                .padding(.horizontal, Theme.Spacing.small.rawValue)
+                .padding(.vertical, Theme.Spacing.tight.rawValue)
+                .background(
+                    Capsule()
+                        .fill(Theme.Colors.secondaryBackground)
+                )
             }
+            .buttonStyle(.plain)
         }
+
+        #if os(macOS)
+        // Mac-specific toolbar items
+        ToolbarItem(placement: .automatic) {
+            Button {
+                // Cancel streaming
+                if isStreaming {
+                    // TODO: Cancel generation via ChatViewModel
+                }
+            } label: {
+                Image(systemName: isStreaming ? "stop.circle" : "ellipsis.circle")
+            }
+            .help(isStreaming ? "Stop generating" : "More options")
+        }
+        #endif
     }
 
     // MARK: - Actions
 
+    /// Gets the placeholder text for the input field based on current model.
+    private func getPlaceholderText() -> String {
+        if isStreaming {
+            return "Generating..."
+        }
+        return "Message \(modelDisplayName)..."
+    }
+
+    /// Scrolls to the bottom of the message list.
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        guard let lastMessage = messages.last else { return }
         withAnimation(.easeInOut(duration: Theme.Animation.default)) {
-            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            proxy.scrollTo("bottom", anchor: .bottom)
         }
     }
 
+    /// Sends the current message and triggers AI response.
     private func sendMessage() {
         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard !isStreaming else { return }
+
+        let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Create user message
         let userMessage = Message(
             role: .user,
-            content: inputText,
+            content: trimmedText,
             conversation: conversation
         )
-        conversation.messages.append(userMessage)
         modelContext.insert(userMessage)
 
         // Update conversation
@@ -201,7 +393,55 @@ struct ChatView: View {
         // Clear input
         inputText = ""
 
+        // Start streaming indicator (will be connected to ChatViewModel in TASK-2.6)
+        isStreaming = true
+
         // TODO: Trigger AI response via ChatViewModel (TASK-2.6)
+        // For now, simulate a response after a delay
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            await MainActor.run {
+                let assistantMessage = Message(
+                    role: .assistant,
+                    content: "This is a placeholder response. The ChatViewModel will be implemented in TASK-2.6 to connect to the actual AI provider.",
+                    conversation: conversation
+                )
+                assistantMessage.outputTokens = 25
+                modelContext.insert(assistantMessage)
+                conversation.updatedAt = Date()
+                isStreaming = false
+            }
+        }
+    }
+}
+
+// MARK: - Typing Indicator
+
+/// Animated typing indicator with three bouncing dots.
+private struct TypingIndicator: View {
+    @State private var isAnimating = false
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Theme.Colors.tertiaryText)
+                    .frame(width: 4, height: 4)
+                    .offset(y: isAnimating ? -3 : 0)
+                    .animation(
+                        .easeInOut(duration: 0.3)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.15),
+                        value: isAnimating
+                    )
+            }
+        }
+        .onAppear {
+            isAnimating = true
+        }
+        .onDisappear {
+            isAnimating = false
+        }
     }
 }
 
@@ -225,6 +465,13 @@ struct ChatView: View {
 #Preview("Empty Chat") {
     NavigationStack {
         ChatView(conversation: Conversation(title: "New Chat"))
+    }
+    .modelContainer(DataManager.createPreviewContainer())
+}
+
+#Preview("Streaming State") {
+    NavigationStack {
+        ChatView(conversation: Conversation(title: "Active Chat"))
     }
     .modelContainer(DataManager.createPreviewContainer())
 }
