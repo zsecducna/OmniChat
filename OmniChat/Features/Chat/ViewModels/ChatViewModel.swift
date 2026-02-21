@@ -3,13 +3,493 @@
 //  OmniChat
 //
 //  Chat logic and streaming orchestration.
+//  Manages message sending, AI response streaming, and conversation state.
 //
 
-import Foundation
 import SwiftUI
+import SwiftData
+import os
+
+// MARK: - StreamingResult
+
+/// Result of a streaming operation.
+private struct StreamingResult: Sendable {
+    var inputTokens: Int = 0
+    var outputTokens: Int = 0
+    var responseModel: String?
+    var finalText: String = ""
+    var error: ProviderError?
+}
+
+// MARK: - ChatViewModel
 
 /// Manages chat state, message sending, and streaming coordination.
+///
+/// ChatViewModel orchestrates all chat operations:
+/// - Managing the current conversation and its messages
+/// - Sending messages to AI providers via streaming
+/// - Handling real-time streaming text updates
+/// - Stopping generation mid-stream
+/// - Retrying failed messages
+/// - Switching models mid-conversation
+///
+/// ## Architecture
+/// ChatViewModel bridges the UI layer with the provider abstraction layer:
+/// - **SwiftData**: Persists messages to `Conversation`
+/// - **ProviderManager**: Creates adapters for AI providers
+/// - **AIProvider**: Streams responses via `AsyncThrowingStream`
+///
+/// ## Usage Example
+/// ```swift
+/// let viewModel = ChatViewModel(modelContext: modelContext, providerManager: providerManager)
+/// viewModel.currentConversation = conversation
+///
+/// // Send a message
+/// await viewModel.sendMessage("Hello, Claude!")
+///
+/// // Stop streaming
+/// viewModel.stopGeneration()
+///
+/// // Retry last message
+/// await viewModel.retryLastMessage()
+/// ```
+///
+/// ## Swift 6 Concurrency
+/// - Marked `@MainActor` for safe UI updates
+/// - Uses `@Observable` for SwiftUI integration
+/// - All async work uses structured concurrency
+/// - Uses `Task { [weak self] in }` to avoid reference cycles
+@MainActor
 @Observable
 final class ChatViewModel {
-    // TODO: Implement chat state management
+
+    // MARK: - Properties
+
+    /// The currently active conversation.
+    var currentConversation: Conversation?
+
+    /// Whether a response is currently being streamed.
+    var isStreaming = false
+
+    /// The accumulated streaming text during response generation.
+    /// This is displayed in real-time in the UI before the final message is saved.
+    var streamingText = ""
+
+    /// The currently selected model ID for this conversation.
+    var selectedModel: String?
+
+    /// The most recent error, if any.
+    var error: ProviderError?
+
+    /// The model context for SwiftData operations.
+    private let modelContext: ModelContext
+
+    /// The provider manager for accessing AI adapters.
+    private let providerManager: ProviderManager
+
+    /// The current streaming task, if any.
+    private var currentTask: Task<StreamingResult, Never>?
+
+    /// Logger for chat operations.
+    private static let logger = Logger(subsystem: Constants.BundleID.base, category: "ChatViewModel")
+
+    // MARK: - Initialization
+
+    /// Creates a new ChatViewModel.
+    ///
+    /// - Parameters:
+    ///   - modelContext: The SwiftData model context for persistence.
+    ///   - providerManager: The provider manager for accessing AI adapters.
+    init(modelContext: ModelContext, providerManager: ProviderManager) {
+        self.modelContext = modelContext
+        self.providerManager = providerManager
+    }
+
+    // MARK: - Computed Properties
+
+    /// Messages for the current conversation, sorted by creation date.
+    var messages: [Message] {
+        guard let conversation = currentConversation else { return [] }
+        return conversation.messages.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// The current AI provider adapter for the conversation.
+    ///
+    /// Returns the provider based on:
+    /// 1. The conversation's `providerConfigID` if set
+    /// 2. Falls back to the default provider
+    var currentProvider: (any AIProvider)? {
+        guard let conversation = currentConversation else {
+            // No conversation, try default provider
+            return try? providerManager.defaultProvider.flatMap { try providerManager.adapter(for: $0) }
+        }
+
+        // Try to get the conversation's configured provider
+        if let providerID = conversation.providerConfigID,
+           let config = providerManager.provider(for: providerID) {
+            return try? providerManager.adapter(for: config)
+        }
+
+        // Fall back to default provider
+        return try? providerManager.defaultProvider.flatMap { try providerManager.adapter(for: $0) }
+    }
+
+    /// The provider configuration for the current conversation.
+    var currentProviderConfig: ProviderConfig? {
+        guard let conversation = currentConversation,
+              let providerID = conversation.providerConfigID else {
+            return providerManager.defaultProvider
+        }
+        return providerManager.provider(for: providerID) ?? providerManager.defaultProvider
+    }
+
+    /// The model ID to use for requests.
+    var effectiveModelID: String {
+        selectedModel ?? currentConversation?.modelID ?? "claude-sonnet-4-5-20250929"
+    }
+
+    /// Whether there are any messages in the conversation.
+    var hasMessages: Bool {
+        !messages.isEmpty
+    }
+
+    /// Whether a retry is possible (has at least one user message).
+    var canRetry: Bool {
+        messages.contains { $0.role == .user }
+    }
+
+    // MARK: - Actions
+
+    /// Sends a message and generates an AI response.
+    ///
+    /// This method:
+    /// 1. Creates a user message in SwiftData
+    /// 2. Builds the message history for the API request
+    /// 3. Starts streaming the AI response
+    /// 4. Creates an assistant message when complete
+    /// 5. Records usage statistics
+    ///
+    /// - Parameters:
+    ///   - text: The message text to send.
+    ///   - attachments: Optional attachments to include with the message.
+    func sendMessage(_ text: String, attachments: [AttachmentPayload] = []) async {
+        guard let conversation = currentConversation else {
+            Self.logger.warning("Attempted to send message without active conversation")
+            return
+        }
+
+        guard let provider = currentProvider else {
+            Self.logger.error("No provider available for sending message")
+            error = ProviderError.notSupported("No AI provider configured")
+            return
+        }
+
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            Self.logger.debug("Skipping empty message")
+            return
+        }
+
+        // Clear previous error
+        error = nil
+
+        // Create user message
+        let userMessage = Message(
+            role: .user,
+            content: trimmedText,
+            conversation: conversation
+        )
+        modelContext.insert(userMessage)
+        conversation.updatedAt = Date()
+
+        Self.logger.debug("User message created: \(trimmedText.prefix(50))...")
+
+        // Build message history for API
+        let chatMessages = buildChatMessages()
+
+        // Capture values needed for streaming
+        let modelID = effectiveModelID
+        let systemPrompt = conversation.systemPrompt
+
+        // Start streaming
+        isStreaming = true
+        streamingText = ""
+
+        // Track start time for duration calculation
+        let startTime = Date()
+
+        // Create streaming task
+        currentTask = Task { [weak self] in
+            guard let self = self else {
+                return StreamingResult()
+            }
+
+            var result = StreamingResult()
+
+            do {
+                let stream = provider.sendMessage(
+                    messages: chatMessages,
+                    model: modelID,
+                    systemPrompt: systemPrompt,
+                    attachments: attachments,
+                    options: RequestOptions(stream: true)
+                )
+
+                for try await event in stream {
+                    // Check for cancellation
+                    if Task.isCancelled {
+                        Self.logger.debug("Stream cancelled by user")
+                        return result
+                    }
+
+                    switch event {
+                    case .textDelta(let delta):
+                        await MainActor.run {
+                            self.streamingText += delta
+                        }
+
+                    case .inputTokenCount(let count):
+                        result.inputTokens = count
+                        Self.logger.debug("Input tokens: \(count)")
+
+                    case .outputTokenCount(let count):
+                        result.outputTokens = count
+
+                    case .modelUsed(let model):
+                        result.responseModel = model
+                        await MainActor.run {
+                            self.selectedModel = model
+                        }
+                        Self.logger.debug("Model confirmed: \(model)")
+
+                    case .done:
+                        Self.logger.info("Stream completed successfully")
+                        // Capture final text
+                        await MainActor.run {
+                            result.finalText = self.streamingText
+                        }
+                        return result
+
+                    case .error(let providerError):
+                        result.error = providerError
+                        return result
+                    }
+                }
+            } catch is CancellationError {
+                Self.logger.debug("Stream cancelled")
+            } catch {
+                result.error = error as? ProviderError ?? ProviderError.providerError(message: error.localizedDescription, code: nil)
+                Self.logger.error("Stream error: \(error.localizedDescription)")
+            }
+
+            // Capture final text even on error
+            await MainActor.run {
+                result.finalText = self.streamingText
+            }
+
+            return result
+        }
+
+        // Wait for completion
+        let result = await currentTask?.value ?? StreamingResult()
+
+        // Handle any error from streaming
+        if let streamError = result.error {
+            error = streamError
+        }
+
+        // Calculate duration
+        let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
+
+        // Create assistant message if we got any response
+        let finalText = result.finalText.isEmpty ? streamingText : result.finalText
+        if !finalText.isEmpty {
+            let assistantMessage = Message(
+                role: .assistant,
+                content: finalText,
+                conversation: conversation
+            )
+            assistantMessage.inputTokens = result.inputTokens
+            assistantMessage.outputTokens = result.outputTokens
+            assistantMessage.modelID = result.responseModel ?? effectiveModelID
+            assistantMessage.providerConfigID = currentProviderConfig?.id
+            assistantMessage.durationMs = durationMs
+            modelContext.insert(assistantMessage)
+
+            // Update conversation totals
+            conversation.totalInputTokens += result.inputTokens
+            conversation.totalOutputTokens += result.outputTokens
+            conversation.updatedAt = Date()
+
+            // Record usage
+            recordUsage(
+                inputTokens: result.inputTokens,
+                outputTokens: result.outputTokens,
+                modelID: result.responseModel ?? effectiveModelID,
+                messageID: assistantMessage.id
+            )
+
+            Self.logger.info("Assistant message created: \(result.inputTokens) input, \(result.outputTokens) output tokens")
+        }
+
+        // Reset streaming state
+        isStreaming = false
+        streamingText = ""
+        currentTask = nil
+    }
+
+    /// Stops the current generation.
+    ///
+    /// Cancels the streaming task and the provider's active request.
+    func stopGeneration() {
+        Self.logger.debug("Stopping generation")
+
+        currentTask?.cancel()
+        currentProvider?.cancel()
+
+        isStreaming = false
+        streamingText = ""
+        currentTask = nil
+    }
+
+    /// Retries the last message exchange.
+    ///
+    /// This method:
+    /// 1. Finds the last user message
+    /// 2. Deletes the last assistant message if it exists
+    /// 3. Re-sends the user message
+    func retryLastMessage() async {
+        guard let lastUserMessage = messages.last(where: { $0.role == .user }) else {
+            Self.logger.warning("No user message to retry")
+            return
+        }
+
+        // Delete last assistant message if it exists
+        if let lastAssistantMessage = messages.last(where: { $0.role == .assistant }) {
+            modelContext.delete(lastAssistantMessage)
+            Self.logger.debug("Deleted last assistant message for retry")
+        }
+
+        // Clear error
+        error = nil
+
+        // Re-send
+        Self.logger.info("Retrying last message")
+        await sendMessage(lastUserMessage.content)
+    }
+
+    /// Switches the model for the current conversation.
+    ///
+    /// - Parameter modelID: The model ID to switch to.
+    func switchModel(to modelID: String) {
+        selectedModel = modelID
+        currentConversation?.modelID = modelID
+        currentConversation?.updatedAt = Date()
+
+        Self.logger.info("Switched model to: \(modelID)")
+    }
+
+    /// Switches the provider for the current conversation.
+    ///
+    /// - Parameter providerID: The provider configuration ID to switch to.
+    func switchProvider(to providerID: UUID) {
+        currentConversation?.providerConfigID = providerID
+        currentConversation?.updatedAt = Date()
+
+        // Clear adapter cache to ensure fresh adapter with correct credentials
+        providerManager.clearAdapterCache(for: providerID)
+
+        Self.logger.info("Switched provider to: \(providerID)")
+    }
+
+    /// Clears the current error.
+    func clearError() {
+        error = nil
+    }
+
+    // MARK: - Private Methods
+
+    /// Builds the array of ChatMessage for the API request.
+    ///
+    /// Converts SwiftData Message objects to Sendable ChatMessage types
+    /// for the provider API.
+    ///
+    /// - Returns: Array of ChatMessage representing the conversation history.
+    private func buildChatMessages() -> [ChatMessage] {
+        guard let conversation = currentConversation else { return [] }
+
+        return conversation.messages.compactMap { message in
+            // Convert attachments to AttachmentPayload
+            let payloads = message.attachments.map { attachment in
+                AttachmentPayload(
+                    data: attachment.data,
+                    mimeType: attachment.mimeType,
+                    fileName: attachment.fileName
+                )
+            }
+
+            return ChatMessage(
+                role: message.role,
+                content: message.content,
+                attachments: payloads
+            )
+        }
+    }
+
+    /// Records usage statistics for a message.
+    ///
+    /// - Parameters:
+    ///   - inputTokens: Number of input tokens used.
+    ///   - outputTokens: Number of output tokens generated.
+    ///   - modelID: The model ID used.
+    ///   - messageID: The message ID.
+    private func recordUsage(
+        inputTokens: Int,
+        outputTokens: Int,
+        modelID: String,
+        messageID: UUID
+    ) {
+        guard let conversation = currentConversation,
+              let providerConfig = currentProviderConfig else {
+            return
+        }
+
+        // Calculate cost
+        let cost = providerConfig.calculateCost(
+            inputTokens: inputTokens,
+            outputTokens: outputTokens
+        )
+
+        // Update conversation cost estimate
+        conversation.estimatedCostUSD += cost
+
+        // Create usage record
+        let usageRecord = UsageRecord(
+            providerConfigID: providerConfig.id,
+            modelID: modelID,
+            conversationID: conversation.id,
+            messageID: messageID,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            costUSD: cost
+        )
+        modelContext.insert(usageRecord)
+
+        Self.logger.debug("Recorded usage: \(inputTokens) input, \(outputTokens) output, $\(String(format: "%.6f", cost))")
+    }
 }
+
+// MARK: - Preview Helpers
+
+#if DEBUG
+extension ChatViewModel {
+    /// Creates a preview ChatViewModel with sample data.
+    static func createPreview() -> ChatViewModel {
+        let container = DataManager.createPreviewContainer()
+        let context = container.mainContext
+        let providerManager = ProviderManager(modelContext: context)
+
+        return ChatViewModel(modelContext: context, providerManager: providerManager)
+    }
+}
+#endif
