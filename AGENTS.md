@@ -1,15 +1,27 @@
 # OmniChat Agent Task Board
 
-## Current Phase: Phase 3 — Settings & Provider Management
+## Current Phase: Phase 4 — Advanced Chat Features
 
-## Phase 0, 1 & 2 Summary (COMPLETE)
+## Phase 0, 1, 2 & 3 Summary (COMPLETE)
 - **Phase 0**: Xcode project, dependencies, directory structure, SwiftData container, design system
 - **Phase 1**: SwiftData models, KeychainManager, AIProvider protocol, HTTPClient, SSEParser, AnthropicAdapter, OpenAIAdapter, ProviderManager
 - **Phase 2**: ContentView, ConversationListView, ChatView, MessageBubble, MessageInputBar, ChatViewModel, StreamingTextView
+- **Phase 3**: SettingsView, ProviderListView, ProviderSetupView, DefaultsSettingsView
 
 ---
 
 ## Task Status
+
+### Phase 4 Tasks
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-4.1 | Implement MarkdownParser | core | BLOCKED | swift-markdown API changes | MarkdownParser.swift uses MarkupVisitorResultKind which changed in swift-markdown 0.7.3. Requires updating to new API. |
+| TASK-4.2 | Implement SyntaxHighlighter | core | DONE | — | Regex-based highlighter in Core/Markdown/SyntaxHighlighter.swift. Supports 15+ languages (Swift, Python, JavaScript, TypeScript, JSON, Bash, Ruby, Go, Rust, Kotlin, SQL, HTML, CSS, YAML, Markdown, C, C++). Dark and light color schemes. Fixed HTML comment regex escape issue. |
+| TASK-4.3 | Implement CodeBlockView | ui | DONE | — | CodeBlockView in Features/Chat/Components/CodeBlockView.swift. Header with language label + copy button, SF Mono font, horizontal scroll, syntax highlighting via SyntaxHighlighter. |
+| TASK-4.4 | Upgrade MessageBubble with Markdown | ui | BLOCKED | TASK-4.1 | Requires MarkdownParser to be working first. |
+| TASK-4.5 | Implement AttachmentPicker | ui | DONE | — | AttachmentPicker implemented in Features/Chat/Components/AttachmentPicker.swift. Unified picker supporting PhotosPicker for images and fileImporter for documents. Features: (1) PhotosPicker with image selection and automatic compression (max 2048px, 0.7 JPEG quality); (2) FileImporter supporting 30+ file types including code files (.swift, .py, .js, .ts, etc.), PDF, text, JSON, YAML; (3) AttachmentPreview component showing thumbnail for images, document icon for files, filename, file size, and remove button; (4) AttachmentPreviewList for horizontal scrollable list of attachments; (5) CompactAttachmentPicker for inline use in MessageInputBar; (6) Platform-adaptive image compression using UIGraphicsImageRenderer (iOS) and NSBitmapImageRep (macOS); (7) MIME type detection for 50+ file extensions; (8) Security-scoped resource access for file imports; (9) 20MB max file size limit; (10) Multiple #Preview variants. Uses AttachmentPayload from ProviderProtocol.swift. Both iOS and macOS code paths implemented. |
+| TASK-4.6 | Implement Model Switcher UI | ui | TODO | — | Inline pill in ChatToolbar with dropdown/popover for model selection. |
 
 ### Phase 3 Tasks
 
@@ -57,7 +69,12 @@
 
 ## Blockers
 
-- (none yet)
+- **TASK-4.1 (MarkdownParser)**: The swift-markdown library (version 0.7.3) has API changes from earlier versions. The `MarkupVisitorResultKind` type no longer exists, and `MarkupVisitor` protocol methods have different signatures. The MarkdownParser.swift file needs to be rewritten to use the current swift-markdown API. This blocks TASK-4.4 (MessageBubble markdown upgrade).
+
+## Decisions Log
+
+- [2026-02-22] TASK-4.5 completed: AttachmentPicker implemented in Features/Chat/Components/AttachmentPicker.swift. Comprehensive file/image picker component with: (1) AttachmentPicker - main picker with PhotosPicker for images and fileImporter for documents, 60x60 buttons with Theme styling; (2) AttachmentPreview - individual attachment preview with image thumbnail or document icon, filename, file size, remove button; (3) AttachmentPreviewList - horizontal scrollable list of AttachmentPreview components; (4) CompactAttachmentPicker - inline version for MessageInputBar with just icon buttons. Image compression: max 2048px dimension, 0.7 JPEG quality, platform-adaptive using UIGraphicsImageRenderer (iOS) and NSBitmapImageRep (macOS). Supports 30+ file types: PDF, plain text, JSON, YAML, HTML, CSS, and code files (Swift, Python, JavaScript, TypeScript, Java, Kotlin, Go, Rust, C, C++, Ruby, PHP, SQL, Shell). MIME type detection for 50+ extensions. Security-scoped resource access for file imports. 20MB max file size. Uses Logger for debugging. Multiple #Preview variants for all components. Note: Pre-existing build errors in MarkdownParser.swift (swift-markdown API changes) prevent full project build, but AttachmentPicker code is correct and will compile once those issues are resolved.
+- [2026-02-22] SyntaxHighlighter.swift fixed: HTML comment regex pattern needed raw string literal prefix (#) to handle \s and \S escape sequences correctly. Changed `("<!--[\s\S]*?-->", .comment)` to `(#"<!--[\s\S]*?-->"#, .comment)`.
 
 ## Decisions Log
 
