@@ -152,4 +152,10 @@ enum DataManager {
             fatalError("Failed to create shared ModelContainer: \(error)")
         }
     }()
+
+    /// A lazily-created in-memory container for previews and tests.
+    ///
+    /// This is a convenience property equivalent to calling `createPreviewContainer()`.
+    /// Use this when you need quick access to a preview container without calling the method.
+    static let previewContainer: ModelContainer = createPreviewContainer()
 }

@@ -1,20 +1,28 @@
 # OmniChat Agent Task Board
 
-## Current Phase: Phase 1 COMPLETE — Phase 2 Next (Chat UI Foundation)
+## Current Phase: Phase 2 — Chat UI Foundation
 
-## Phase 0 Summary (COMPLETE)
-All Phase 0 tasks completed successfully:
-- Xcode multiplatform project created with xcodegen
-- Swift Package dependencies (swift-markdown, Splash)
-- Full directory structure matching MASTER_PLAN.md
-- SwiftData container with CloudKit integration
-- Raycast-inspired design system foundation
+## Phase 0 & 1 Summary (COMPLETE)
+- **Phase 0**: Xcode project, dependencies, directory structure, SwiftData container, design system
+- **Phase 1**: SwiftData models, KeychainManager, AIProvider protocol, HTTPClient, SSEParser, AnthropicAdapter, OpenAIAdapter, ProviderManager
 
 ---
 
 ## Task Status
 
-### Phase 1 Tasks
+### Phase 2 Tasks
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-2.1 | Implement ContentView (Root Navigation) | ui | DONE | — | NavigationSplitView with sidebar (ConversationListView) + detail (ChatView or EmptyStateView). Keyboard shortcuts: Cmd+N for new chat, Cmd+, for settings. Platform adaptive: side-by-side on iPad/Mac, push navigation on iPhone. Uses Theme design system. |
+| TASK-2.2 | Implement ConversationListView | ui | TODO | — | List with @Query, search, swipe actions |
+| TASK-2.3 | Implement ChatView | ui | TODO | TASK-2.1 | ScrollView + LazyVStack for messages |
+| TASK-2.4 | Implement MessageBubble | ui | TODO | TASK-2.3 | User/assistant styling, dense spacing |
+| TASK-2.5 | Implement MessageInputBar | ui | TODO | TASK-2.3 | Multi-line input, send button, attachment |
+| TASK-2.6 | Implement ChatViewModel | ui | TODO | TASK-2.3 | @Observable, streaming orchestration |
+| TASK-2.7 | Implement StreamingTextView | ui | TODO | TASK-2.6 | Token-by-token rendering |
+
+### Phase 1 Tasks (COMPLETE)
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
