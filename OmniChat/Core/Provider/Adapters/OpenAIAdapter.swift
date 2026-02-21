@@ -37,7 +37,7 @@ import os
 /// ## Example Usage
 /// ```swift
 /// let config = ProviderConfig(name: "My OpenAI", providerType: .openai)
-/// let adapter = OpenAIAdapter(config: config, apiKey: "sk-...")
+/// let adapter = OpenAIAdapter(config: config.makeSnapshot(), apiKey: "sk-...")
 ///
 /// let stream = adapter.sendMessage(
 ///     messages: [ChatMessage(role: .user, content: "Hello")],
@@ -58,7 +58,7 @@ final class OpenAIAdapter: AIProvider, Sendable {
     // MARK: - Properties
 
     /// The configuration for this provider instance.
-    let config: ProviderConfig
+    let config: ProviderConfigSnapshot
 
     /// The HTTP client for making requests.
     private let httpClient: HTTPClient
@@ -107,12 +107,12 @@ final class OpenAIAdapter: AIProvider, Sendable {
     /// Creates a new OpenAI adapter.
     ///
     /// - Parameters:
-    ///   - config: The provider configuration (contains base URL, custom headers, etc.)
+    ///   - config: The provider configuration snapshot (contains base URL, custom headers, etc.)
     ///   - apiKey: The OpenAI API key (should be retrieved from Keychain)
     ///   - httpClient: The HTTP client for making requests (defaults to new instance)
     /// - Throws: `ProviderError.invalidAPIKey` if the API key is empty.
     init(
-        config: ProviderConfig,
+        config: ProviderConfigSnapshot,
         apiKey: String,
         httpClient: HTTPClient = HTTPClient()
     ) throws {
@@ -599,13 +599,17 @@ private struct AnyCodable: Encodable {
             try container.encode(array.map { AnyCodable($0) })
         } else if let dict = value as? [String: Any] {
             try container.encode(dict.mapValues { AnyCodable($0) })
-        } else if let optional = value as? Optional<Any>, optional == nil {
-            try container.encodeNil()
         } else {
-            throw EncodingError.invalidValue(
-                value,
-                EncodingError.Context(codingPath: container.codingPath, debugDescription: "Unsupported type")
-            )
+            // Use Mirror to check for nil optionals
+            let mirror = Mirror(reflecting: value)
+            if mirror.displayStyle == .optional, mirror.children.isEmpty {
+                try container.encodeNil()
+            } else {
+                throw EncodingError.invalidValue(
+                    value,
+                    EncodingError.Context(codingPath: container.codingPath, debugDescription: "Unsupported type: \(type(of: value))")
+                )
+            }
         }
     }
 }

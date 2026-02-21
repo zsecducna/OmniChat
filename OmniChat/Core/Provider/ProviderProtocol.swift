@@ -25,7 +25,8 @@ import Foundation
 ///
 /// ## Usage Example
 /// ```swift
-/// let provider: any AIProvider = AnthropicAdapter(config: config, apiKey: apiKey)
+/// let configSnapshot = config.makeSnapshot()
+/// let provider: any AIProvider = AnthropicAdapter(config: configSnapshot, apiKey: apiKey)
 /// let stream = try await provider.sendMessage(
 ///     messages: [ChatMessage(role: .user, content: "Hello")],
 ///     model: "claude-sonnet-4-5-20250929",
@@ -49,7 +50,8 @@ protocol AIProvider: Sendable {
     ///
     /// Contains provider type, base URL, available models, and non-secret settings.
     /// API keys and OAuth tokens are stored separately in the Keychain.
-    var config: ProviderConfig { get }
+    /// This is a Sendable snapshot of the ProviderConfig SwiftData model.
+    var config: ProviderConfigSnapshot { get }
 
     /// Returns available models for this provider.
     ///

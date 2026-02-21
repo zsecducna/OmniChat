@@ -29,7 +29,7 @@ import os
 /// ## Example Usage
 /// ```swift
 /// let config = ProviderConfig(name: "My Claude", providerType: .anthropic)
-/// let adapter = AnthropicAdapter(config: config, apiKey: "sk-ant-...")
+/// let adapter = AnthropicAdapter(config: config.makeSnapshot(), apiKey: "sk-ant-...")
 ///
 /// let stream = adapter.sendMessage(
 ///     messages: [ChatMessage(role: .user, content: "Hello")],
@@ -55,7 +55,7 @@ final class AnthropicAdapter: AIProvider, Sendable {
     // MARK: - Properties
 
     /// The configuration for this provider instance.
-    let config: ProviderConfig
+    let config: ProviderConfigSnapshot
 
     /// The HTTP client for making API requests.
     private let httpClient: HTTPClient
@@ -80,12 +80,12 @@ final class AnthropicAdapter: AIProvider, Sendable {
     /// Creates a new Anthropic adapter.
     ///
     /// - Parameters:
-    ///   - config: The provider configuration containing base URL and other settings.
+    ///   - config: The provider configuration snapshot containing base URL and other settings.
     ///   - apiKey: The Anthropic API key for authentication.
     ///   - httpClient: The HTTP client for making requests (defaults to new instance).
     /// - Precondition: `apiKey` must not be empty.
     init(
-        config: ProviderConfig,
+        config: ProviderConfigSnapshot,
         apiKey: String,
         httpClient: HTTPClient = HTTPClient()
     ) {
