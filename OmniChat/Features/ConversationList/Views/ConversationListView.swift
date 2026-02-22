@@ -207,6 +207,12 @@ struct ConversationListView: View {
                     Button("Cancel") {
                         exitEditMode()
                     }
+                } else {
+                    Button {
+                        onCreateNewConversation?()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
 
@@ -249,6 +255,12 @@ struct ConversationListView: View {
                     }
                     .disabled(selectedConversations.isEmpty)
                 } else {
+                    Button {
+                        onCreateNewConversation?()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+
                     Button {
                         isEditMode = true
                     } label: {

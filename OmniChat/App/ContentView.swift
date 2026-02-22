@@ -31,9 +31,6 @@ struct ContentView: View {
     /// The currently selected conversation, if any.
     @State private var selectedConversation: Conversation?
 
-    /// Controls presentation of the settings sheet.
-    @State private var showSettings = false
-
     /// Controls presentation of the new conversation title input alert.
     @State private var showNewConversationAlert = false
 
@@ -51,12 +48,6 @@ struct ContentView: View {
         } detail: {
             detailView
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-                #if os(macOS)
-                .frame(minWidth: 500, minHeight: 400)
-                #endif
-        }
     }
 
     // MARK: - Sidebar
@@ -70,9 +61,6 @@ struct ContentView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                toolbarContent
-            }
             .alert("New Conversation", isPresented: $showNewConversationAlert) {
                 TextField("Title (optional)", text: $newConversationTitle)
                     #if os(iOS)
@@ -98,31 +86,6 @@ struct ContentView: View {
             ChatView(conversation: conversation)
         } else {
             EmptyStateView()
-        }
-    }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Button(action: { showNewConversationAlert = true }) {
-                Label("New Chat", systemImage: "plus")
-            }
-            .keyboardShortcut("n", modifiers: .command)
-            .help("Create a new conversation (⌘N)")
-            .accessibilityLabel("New conversation")
-            .accessibilityHint("Creates a new chat conversation")
-        }
-
-        ToolbarItem(placement: .secondaryAction) {
-            Button(action: { showSettings = true }) {
-                Label("Settings", systemImage: "gearshape")
-            }
-            .keyboardShortcut(",", modifiers: .command)
-            .help("Open settings (⌘,)")
-            .accessibilityLabel("Settings")
-            .accessibilityHint("Opens application settings")
         }
     }
 
