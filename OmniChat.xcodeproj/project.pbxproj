@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -245,7 +245,7 @@
 		5D16E98AB4FF7680BC98CC60 /* OllamaAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OllamaAdapter.swift; sourceTree = "<group>"; };
 		6481460227F95C1D6F445EC0 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		67F90A3149EACE4BD53744E7 /* UsageRecordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageRecordTests.swift; sourceTree = "<group>"; };
-		6C1E22C91CF696507D75CCB1 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		6C1E22C91CF696507D75CCB1 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
 		6FF80BD25EA364923296841C /* Persona.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persona.swift; sourceTree = "<group>"; };
 		77673ABF5B817645D8CA294D /* CustomAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomAdapter.swift; sourceTree = "<group>"; };
 		78F67FA89969432954AB179F /* openai_stream_response.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = openai_stream_response.txt; sourceTree = "<group>"; };
@@ -263,7 +263,7 @@
 		9A3CBAA942C9397C2C2DF8EA /* NetworkError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkError.swift; sourceTree = "<group>"; };
 		9ACA8A827E338BF8B6C14BA1 /* MessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageTests.swift; sourceTree = "<group>"; };
 		9BD664227A83E34C49587BFD /* TestDataFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestDataFactory.swift; sourceTree = "<group>"; };
-		9C04BE91ACFACB3D0399BB3D /* OmniChatTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OmniChatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9C04BE91ACFACB3D0399BB3D /* OmniChatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OmniChatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9D344533C07BB4033937D1DD /* ProviderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderListView.swift; sourceTree = "<group>"; };
 		9F65B4ECC3CEAA1A0E9DD237 /* View+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extensions.swift"; sourceTree = "<group>"; };
 		A19CA6627067888A88936E27 /* ChatToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatToolbar.swift; sourceTree = "<group>"; };
@@ -961,7 +961,6 @@
 				640427BB0F6B60FEED79ED6C /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				5E29F2DAC3791485B63AC291 /* XCRemoteSwiftPackageReference "Splash" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1330,7 +1329,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat;
 				PRODUCT_NAME = OmniChat;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1406,7 +1405,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.uitests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat.uitests;
 				PRODUCT_NAME = OmniChatUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1426,7 +1425,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat.tests;
 				PRODUCT_NAME = OmniChatTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OmniChat.app/Contents/MacOS/OmniChat";
@@ -1444,7 +1443,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.uitests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat.uitests;
 				PRODUCT_NAME = OmniChatUITests;
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = OmniChat_macOS;
@@ -1456,13 +1455,15 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_MODULES = YES;
+				DEVELOPMENT_TEAM = BX5MBA458R;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat;
 				PRODUCT_NAME = OmniChatTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1482,7 +1483,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat.tests;
 				PRODUCT_NAME = OmniChatTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OmniChat.app/Contents/MacOS/OmniChat";
@@ -1494,13 +1495,15 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_MODULES = YES;
+				DEVELOPMENT_TEAM = BX5MBA458R;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat;
 				PRODUCT_NAME = OmniChatTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1525,7 +1528,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat;
 				PRODUCT_NAME = OmniChat;
 				SDKROOT = macosx;
 			};
@@ -1548,7 +1551,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat;
 				PRODUCT_NAME = OmniChat;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1565,7 +1568,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.uitests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat.uitests;
 				PRODUCT_NAME = OmniChatUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1584,7 +1587,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat.uitests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat.uitests;
 				PRODUCT_NAME = OmniChatUITests;
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = OmniChat_macOS;
@@ -1608,7 +1611,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.omnichat;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zsec.omnichat;
 				PRODUCT_NAME = OmniChat;
 				SDKROOT = macosx;
 			};

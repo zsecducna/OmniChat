@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
-		<string>iCloud.com.yourname.omnichat</string>
+		<string>iCloud.com.zsec.omnichat</string>
 	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
@@ -13,7 +13,7 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.yourname.omnichat.shared</string>
+		<string>group.com.zsec.omnichat.shared</string>
 	</array>
 	<key>com.apple.security.network.client</key>
 	<true/>

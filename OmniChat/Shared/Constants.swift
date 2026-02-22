@@ -11,9 +11,9 @@ import Foundation
 enum Constants {
     /// Bundle identifier components.
     enum BundleID {
-        static let base = "com.yourname.omnichat"
-        static let iCloud = "iCloud.com.yourname.omnichat"
-        static let shared = "com.yourname.omnichat.shared"
+        static let base = "com.zsec.omnichat"
+        static let iCloud = "iCloud.com.zsec.omnichat"
+        static let shared = "com.zsec.omnichat.shared"
     }
 
     /// API configuration defaults.

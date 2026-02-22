@@ -68,5 +68,5 @@ xcodebuild -scheme OmniChat -destination 'platform=iOS Simulator,name=iPhone 16 
 ## Deployment
 - iOS 17.0, iPadOS 17.0, macOS 14.0 (Sonoma)
 - Distribution: App Store — Free with Ads (ads are last milestone)
-- Bundle ID: com.yourname.omnichat
-- iCloud container: iCloud.com.yourname.omnichat
+- Bundle ID: com.zsec.omnichat
+- iCloud container: iCloud.com.zsec.omnichat
