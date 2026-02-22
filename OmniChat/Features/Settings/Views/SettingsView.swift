@@ -258,56 +258,6 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Usage Dashboard View (Placeholder)
-
-/// Placeholder view for usage and cost tracking dashboard.
-///
-/// This view will display:
-/// - Token usage statistics (daily, weekly, monthly)
-/// - Cost breakdown by provider and model
-/// - Per-conversation usage data
-///
-/// Implementation planned for Phase 8.
-struct UsageDashboardView: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        #if os(iOS)
-        NavigationStack {
-            usageContent
-                .navigationTitle("Usage & Costs")
-                .navigationBarTitleDisplayMode(.inline)
-        }
-        #else
-        usageContent
-            .navigationTitle("Usage & Costs")
-        #endif
-    }
-
-    private var usageContent: some View {
-        VStack(spacing: Theme.Spacing.large.rawValue) {
-            Spacer()
-
-            Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.Colors.tertiaryText.resolve(in: colorScheme))
-
-            Text("Usage Tracking")
-                .font(Theme.Typography.title)
-
-            Text("Track your token usage and costs across all providers.\n\nThis feature will be implemented in Phase 8.")
-                .font(Theme.Typography.body)
-                .foregroundStyle(Theme.Colors.secondaryText.resolve(in: colorScheme))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.Spacing.extraLarge.rawValue)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.background.resolve(in: colorScheme))
-    }
-}
-
 // MARK: - Previews
 
 #Preview("Settings - iOS") {
