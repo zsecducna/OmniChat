@@ -111,6 +111,7 @@ struct ProviderSetupView: View {
     @State private var validationError: String?
     @State private var isValidated = false
     @State private var isFetchingModels = false
+    @State private var modelFetchError: String?
     @State private var isTestingConnection = false
     @State private var connectionTestResult: ConnectionTestResult?
 
@@ -1240,6 +1241,17 @@ struct ProviderSetupView: View {
                 Text("Fetch available models from the provider")
             }
 
+            // Show error if fetch failed
+            if let error = modelFetchError {
+                Section {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.warning)
+                } header: {
+                    Text("Warning")
+                }
+            }
+
             if !availableModels.isEmpty {
                 Section("Available Models") {
                     ForEach(availableModels) { model in
@@ -1285,6 +1297,18 @@ struct ProviderSetupView: View {
                         .font(Theme.Typography.bodySecondary)
                         .foregroundStyle(Theme.Colors.secondaryText)
                 }
+            } else {
+                // Show loading indicator while fetching
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .padding()
+                        Spacer()
+                    }
+                } header: {
+                    Text("Loading Models")
+                }
             }
         }
         .formStyle(.grouped)
@@ -1292,7 +1316,8 @@ struct ProviderSetupView: View {
             continueButton(canProceed: selectedModelID != nil)
         }
         .onAppear {
-            if availableModels.isEmpty {
+            // Only load defaults if we're not currently fetching and have no models
+            if availableModels.isEmpty && !isFetchingModels {
                 loadDefaultModels()
             }
         }
@@ -1667,6 +1692,10 @@ struct ProviderSetupView: View {
 
     private func fetchModels() {
         isFetchingModels = true
+        modelFetchError = nil
+
+        let logger = os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
+        logger.debug("Fetching models for provider type: \(self.providerType.rawValue)")
 
         Task {
             do {
@@ -1700,9 +1729,12 @@ struct ProviderSetupView: View {
                 switch providerType {
                 case .anthropic, .openai:
                     let adapter = try getAdapter(for: tempConfig, apiKey: apiKey)
+                    logger.debug("Calling adapter.fetchModels() for \(self.providerType.rawValue)")
                     let models = try await adapter.fetchModels()
+                    logger.debug("Fetched \(models.count) models successfully")
                     await MainActor.run {
                         isFetchingModels = false
+                        modelFetchError = nil
                         availableModels = models.sorted { $0.displayName < $1.displayName }
                         if selectedModelID == nil {
                             selectedModelID = models.first?.id
@@ -1711,9 +1743,12 @@ struct ProviderSetupView: View {
 
                 case .ollama:
                     // Fetch from Ollama directly
+                    logger.debug("Fetching models from Ollama server")
                     let models = try await fetchOllamaModels(baseURL: tempConfig.effectiveBaseURL ?? "http://localhost:11434")
+                    logger.debug("Fetched \(models.count) models from Ollama")
                     await MainActor.run {
                         isFetchingModels = false
+                        modelFetchError = nil
                         availableModels = models
                         if selectedModelID == nil {
                             selectedModelID = models.first?.id
@@ -1722,24 +1757,31 @@ struct ProviderSetupView: View {
 
                 case .custom:
                     // For custom providers, try to fetch from /v1/models or use defaults
+                    logger.debug("Fetching models from custom provider")
                     if let models = try? await fetchCustomProviderModels(config: tempConfig), !models.isEmpty {
+                        logger.debug("Fetched \(models.count) models from custom provider")
                         await MainActor.run {
                             isFetchingModels = false
+                            modelFetchError = nil
                             availableModels = models
                             if selectedModelID == nil {
                                 selectedModelID = models.first?.id
                             }
                         }
                     } else {
+                        logger.debug("Custom provider fetch failed, using defaults")
                         await MainActor.run {
                             isFetchingModels = false
+                            modelFetchError = "Could not fetch models from provider. Using defaults."
                             loadDefaultModels()
                         }
                     }
                 }
             } catch {
+                logger.error("Failed to fetch models: \(error.localizedDescription)")
                 await MainActor.run {
                     isFetchingModels = false
+                    modelFetchError = "Failed to fetch models: \(error.localizedDescription)"
                     // Use default models if fetch fails
                     loadDefaultModels()
                 }
@@ -1834,10 +1876,15 @@ struct ProviderSetupView: View {
     }
 
     private func loadDefaultModels() {
+        let logger = os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
+        logger.debug("Loading default models for provider type: \(self.providerType.rawValue)")
+
         availableModels = getDefaultModels(for: providerType)
         if selectedModelID == nil {
             selectedModelID = availableModels.first?.id
         }
+
+        logger.debug("Loaded \(self.availableModels.count) default models")
     }
 
     private func saveProvider() {
