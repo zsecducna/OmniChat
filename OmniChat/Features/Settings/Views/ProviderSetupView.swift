@@ -171,40 +171,37 @@ struct ProviderSetupView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Step indicator
-                stepIndicator
-                    .padding(.vertical, Theme.Spacing.medium.rawValue)
-
-                Divider()
-
-                // Step content
-                ScrollView {
-                    stepContent
-                        .padding(.vertical, Theme.Spacing.medium.rawValue)
-                }
-            }
-            .navigationTitle(isEditing ? "Edit Provider" : "Add Provider")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(actionButtonTitle) {
-                        handleActionButton()
+            stepContent
+                .navigationTitle(isEditing ? "Edit Provider" : "Add Provider")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
                     }
-                    .disabled(!canProceed)
+
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(actionButtonTitle) {
+                            handleActionButton()
+                        }
+                        .disabled(!canProceed)
+                    }
                 }
-            }
-            .onAppear {
-                if let provider = provider {
-                    loadProviderData(provider)
+                .safeAreaInset(edge: .top) {
+                    VStack(spacing: 0) {
+                        stepIndicator
+                            .padding(.vertical, Theme.Spacing.medium.rawValue)
+                            .background(.ultraThinMaterial)
+
+                        Divider()
+                    }
                 }
-            }
+                .onAppear {
+                    if let provider = provider {
+                        loadProviderData(provider)
+                    }
+                }
         }
         #if os(iOS)
         .presentationDetents([.large])

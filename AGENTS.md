@@ -128,6 +128,8 @@ None - Phase 10 complete. Both iOS and macOS builds succeed. All 56 unit tests p
 
 ## Recent Fixes
 
+- [2026-02-22] FIX: "Add Provider" screen still showing blank/empty after initial NavigationStack fix. Root cause: SwiftUI Form wrapped in a VStack inside a ScrollView in a sheet context causes the Form to collapse/appear empty. The Form is designed to manage its own scrolling, and placing it inside a ScrollView causes layout issues. Fixed by restructuring ProviderSetupView.swift body: (1) Removed VStack and ScrollView wrapper around stepContent; (2) Moved stepIndicator to safeAreaInset(edge: .top) with .ultraThinMaterial background; (3) Let stepContent (which returns Form) handle its own layout directly. The step content forms already have their own safeAreaInset(edge: .bottom) for continue buttons. Both iOS and macOS builds succeed.
+
 - [2026-02-22] FIX: "Add Provider" screen showing blank/empty. Root cause was nested NavigationStack in ProviderListView.swift sheet modifiers. The sheets wrapped ProviderSetupView in NavigationStack, but ProviderSetupView already has its own NavigationStack in its body, causing display issues. Fixed by removing the redundant NavigationStack wrappers from both `.sheet(isPresented:)` and `.sheet(item:)` modifiers in ProviderListView.swift (lines 95-104). Both iOS and macOS builds succeed.
 
 ---
