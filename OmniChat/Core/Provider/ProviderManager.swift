@@ -155,9 +155,9 @@ final class ProviderManager {
             Self.logger.debug("Created OpenAI adapter for '\(config.name)'")
 
         case .ollama:
-            // Placeholder for OllamaAdapter (Phase 7)
-            Self.logger.warning("Ollama adapter not yet implemented")
-            throw ProviderError.notSupported("Ollama adapter not yet implemented")
+            // Ollama does not require authentication
+            adapter = OllamaAdapter(config: snapshot)
+            Self.logger.debug("Created Ollama adapter for '\(config.name)'")
 
         case .custom:
             // Placeholder for CustomAdapter (Phase 7)
