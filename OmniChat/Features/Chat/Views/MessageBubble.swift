@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// Renders a single message in the chat with appropriate styling.
 ///
@@ -41,6 +42,9 @@ struct MessageBubble: View {
     /// Parsed content for assistant messages (cached).
     @State private var parsedContent: ParsedContent?
 
+    /// Animation state for message appearance.
+    @State private var hasAppeared = false
+
     // MARK: - Body
 
     var body: some View {
@@ -72,6 +76,32 @@ struct MessageBubble: View {
                 parsedContent = nil
             }
         }
+        .task {
+            // Animate appearance with fade + slide up
+            withAnimation(.spring(response: Theme.Animation.default, dampingFraction: 0.85)) {
+                hasAppeared = true
+            }
+        }
+        .opacity(hasAppeared ? 1 : 0)
+        .offset(y: hasAppeared ? 0 : 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(message.role == .user ? .isStaticText : [])
+    }
+
+    // MARK: - Accessibility
+
+    /// Computed accessibility label for the message.
+    private var accessibilityLabel: String {
+        let roleLabel = message.role == .user ? "Your message" : "AI response"
+        let timeLabel = message.createdAt.formatted(date: .omitted, time: .shortened)
+        var label = "\(roleLabel), \(timeLabel)"
+
+        if let tokens = message.outputTokens {
+            label += ", \(tokens) tokens"
+        }
+
+        return label
     }
 
     // MARK: - Subviews
@@ -143,6 +173,7 @@ struct MessageBubble: View {
         Image(systemName: "bubble.left.circle.fill")
             .font(.system(size: 20))
             .foregroundStyle(Theme.Colors.anthropicAccent)
+            .accessibilityHidden(true) // Decorative, parent has label
     }
 
     @ViewBuilder
@@ -150,6 +181,7 @@ struct MessageBubble: View {
         Image(systemName: "person.circle.fill")
             .font(.system(size: 20))
             .foregroundStyle(Theme.Colors.accent)
+            .accessibilityHidden(true) // Decorative, parent has label
     }
 
     @ViewBuilder
@@ -170,15 +202,23 @@ struct MessageBubble: View {
     @ViewBuilder
     private var copyButton: some View {
         Button {
-            #if os(iOS)
-            UIPasteboard.general.string = message.content
-            #elseif os(macOS)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(message.content, forType: .string)
-            #endif
+            copyToClipboard()
         } label: {
             Label("Copy", systemImage: "doc.on.doc")
         }
+        .accessibilityLabel("Copy message")
+        .accessibilityHint("Copies the message content to clipboard")
+    }
+
+    /// Copies the message content to clipboard with haptic feedback.
+    private func copyToClipboard() {
+        #if os(iOS)
+        UIPasteboard.general.string = message.content
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(message.content, forType: .string)
+        #endif
     }
 
     // MARK: - Markdown Parsing

@@ -80,11 +80,15 @@ struct ProviderListView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Add provider")
+                .accessibilityHint("Opens the provider setup wizard")
             }
 
             #if os(iOS)
             ToolbarItem(placement: .navigationBarLeading) {
                 EditButton()
+                    .accessibilityLabel("Edit providers")
+                    .accessibilityHint("Toggle edit mode to reorder or delete providers")
             }
             #endif
         }
@@ -190,6 +194,8 @@ struct ProviderListView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     /// Delete swipe action button.
@@ -200,6 +206,8 @@ struct ProviderListView: View {
         } label: {
             Label("Delete", systemImage: "trash")
         }
+        .accessibilityLabel("Delete \(provider.name)")
+        .accessibilityHint("Shows confirmation to delete this provider")
     }
 
     /// Toggle enable/disable swipe action button.
@@ -214,6 +222,8 @@ struct ProviderListView: View {
             )
         }
         .tint(provider.isEnabled ? .orange : .green)
+        .accessibilityLabel(provider.isEnabled ? "Disable \(provider.name)" : "Enable \(provider.name)")
+        .accessibilityHint(provider.isEnabled ? "Temporarily disables this provider" : "Re-enables this provider")
     }
 
     // MARK: - Actions

@@ -62,6 +62,7 @@ struct ConversationRow: View {
                     Image(systemName: "pin.fill")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
                 }
 
                 // Archive indicator
@@ -69,6 +70,7 @@ struct ConversationRow: View {
                     Image(systemName: "archivebox")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(Theme.Colors.secondaryText)
+                        .accessibilityHidden(true)
                 }
             }
 
@@ -79,6 +81,7 @@ struct ConversationRow: View {
                     Circle()
                         .fill(Theme.Colors.accentColor(for: providerType))
                         .frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
                 }
 
                 // Message preview
@@ -97,6 +100,28 @@ struct ConversationRow: View {
             }
         }
         .padding(.vertical, Theme.Spacing.extraSmall.rawValue)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    // MARK: - Accessibility
+
+    /// Computed accessibility label for VoiceOver.
+    private var accessibilityLabel: String {
+        var label = conversation.title
+
+        if conversation.isPinned {
+            label = "Pinned: " + label
+        }
+
+        if conversation.isArchived {
+            label = "Archived: " + label
+        }
+
+        label += ", " + messagePreview
+        label += ", " + conversation.updatedAt.formatted(.relative(presentation: .named, unitsStyle: .wide))
+
+        return label
     }
 }
 

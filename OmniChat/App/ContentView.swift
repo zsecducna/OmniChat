@@ -86,6 +86,9 @@ struct ContentView: View {
                 Label("New Chat", systemImage: "square.and.pencil")
             }
             .keyboardShortcut("n", modifiers: .command)
+            .help("Create a new conversation (⌘N)")
+            .accessibilityLabel("New conversation")
+            .accessibilityHint("Creates a new chat conversation")
         }
 
         ToolbarItem(placement: .secondaryAction) {
@@ -93,6 +96,9 @@ struct ContentView: View {
                 Label("Settings", systemImage: "gearshape")
             }
             .keyboardShortcut(",", modifiers: .command)
+            .help("Open settings (⌘,)")
+            .accessibilityLabel("Settings")
+            .accessibilityHint("Opens application settings")
         }
     }
 
@@ -119,6 +125,7 @@ struct EmptyStateView: View {
             Image(systemName: "bubble.left.and.bubble.right.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(Theme.Colors.secondaryText)
+                .accessibilityHidden(true)
 
             Text("Select a conversation")
                 .font(Theme.Typography.title)
@@ -130,6 +137,8 @@ struct EmptyStateView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.background)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 

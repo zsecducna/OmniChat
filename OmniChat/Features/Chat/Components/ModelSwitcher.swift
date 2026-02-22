@@ -180,6 +180,7 @@ struct ModelSwitcher: View {
             Circle()
                 .fill(providerColor)
                 .frame(width: isCompact ? 6 : 8, height: isCompact ? 6 : 8)
+                .accessibilityHidden(true)
 
             // Model name
             Text(modelDisplayName)
@@ -191,6 +192,7 @@ struct ModelSwitcher: View {
                 Image(systemName: "eye.fill")
                     .font(.system(size: isCompact ? 8 : 10))
                     .foregroundStyle(providerColor.opacity(0.8))
+                    .accessibilityHidden(true)
             }
 
             // Chevron indicator
@@ -198,6 +200,7 @@ struct ModelSwitcher: View {
             Image(systemName: "chevron.down")
                 .font(.system(size: 8, weight: .medium))
                 .foregroundStyle(Theme.Colors.tertiaryText)
+                .accessibilityHidden(true)
             #endif
         }
         .padding(.horizontal, isCompact ? Theme.Spacing.small.rawValue : Theme.Spacing.small.rawValue)
@@ -206,6 +209,8 @@ struct ModelSwitcher: View {
             Capsule()
                 .fill(Theme.Colors.tertiaryBackground.resolve(in: colorScheme))
         )
+        .accessibilityLabel("Current model: \(modelDisplayName)")
+        .accessibilityHint("Double tap to switch to a different model")
     }
 }
 

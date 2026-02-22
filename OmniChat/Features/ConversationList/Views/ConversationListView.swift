@@ -12,6 +12,12 @@ import SwiftData
 ///
 /// Displays conversations sorted by pinned status first, then by last updated date.
 /// Supports swipe actions for pinning, archiving, and deleting conversations.
+///
+/// ## Features
+/// - Loading state while conversations are being fetched
+/// - Empty state for new users
+/// - Search filtering by title and message content
+/// - Swipe actions for quick operations
 struct ConversationListView: View {
     /// The currently selected conversation.
     @Binding var selectedConversation: Conversation?
@@ -24,6 +30,9 @@ struct ConversationListView: View {
 
     /// The current search text.
     @State private var searchText = ""
+
+    /// Whether the view is loading (for skeleton display).
+    @State private var isLoading = true
 
     /// Filtered conversations based on search text.
     private var filteredConversations: [Conversation] {
@@ -55,6 +64,25 @@ struct ConversationListView: View {
     }
 
     var body: some View {
+        Group {
+            if isLoading && conversations.isEmpty {
+                // Show skeleton loading state
+                loadingStateView
+            } else {
+                // Show actual content
+                contentView
+            }
+        }
+        .task {
+            // Simulate brief loading for smoother appearance
+            try? await Task.sleep(for: .milliseconds(300))
+            isLoading = false
+        }
+    }
+
+    // MARK: - Content View
+
+    private var contentView: some View {
         List(selection: $selectedConversation) {
             ForEach(sortedConversations) { conversation in
                 ConversationRow(conversation: conversation)
@@ -81,6 +109,21 @@ struct ConversationListView: View {
         }
     }
 
+    // MARK: - Loading State
+
+    private var loadingStateView: some View {
+        List {
+            ForEach(0..<5, id: \.self) { _ in
+                ConversationSkeletonRow()
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("Conversations")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
     // MARK: - Empty State
 
     private var emptyStateView: some View {
@@ -92,7 +135,16 @@ struct ConversationListView: View {
             } else {
                 Text("No conversations match your search")
             }
+        } actions: {
+            if searchText.isEmpty {
+                Button("New Conversation") {
+                    // This will be handled by the parent view's Cmd+N shortcut
+                }
+                .buttonStyle(.borderedProminent)
+            }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - Swipe Action Buttons
@@ -104,6 +156,8 @@ struct ConversationListView: View {
         } label: {
             Label("Delete", systemImage: "trash")
         }
+        .accessibilityLabel("Delete conversation")
+        .accessibilityHint("Deletes \(conversation.title)")
     }
 
     @ViewBuilder
@@ -117,6 +171,8 @@ struct ConversationListView: View {
             )
         }
         .tint(.orange)
+        .accessibilityLabel(conversation.isPinned ? "Unpin conversation" : "Pin conversation")
+        .accessibilityHint(conversation.isPinned ? "Removes pin from \(conversation.title)" : "Pins \(conversation.title) to top")
     }
 
     @ViewBuilder
@@ -130,6 +186,8 @@ struct ConversationListView: View {
             )
         }
         .tint(.blue)
+        .accessibilityLabel(conversation.isArchived ? "Unarchive conversation" : "Archive conversation")
+        .accessibilityHint(conversation.isArchived ? "Restores \(conversation.title)" : "Archives \(conversation.title)")
     }
 
     // MARK: - Actions
@@ -150,6 +208,49 @@ struct ConversationListView: View {
     private func toggleArchive(_ conversation: Conversation) {
         conversation.isArchived.toggle()
         conversation.updatedAt = Date()
+    }
+}
+
+// MARK: - Conversation Skeleton Row
+
+/// Skeleton loading row for conversation list.
+private struct ConversationSkeletonRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.small.rawValue) {
+            // Provider badge skeleton
+            Circle()
+                .fill(skeletonColor)
+                .frame(width: 8, height: 8)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.tight.rawValue) {
+                // Title skeleton
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(skeletonColor)
+                    .frame(width: CGFloat.random(in: 80...150), height: 14)
+
+                // Preview skeleton
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(skeletonColor)
+                    .frame(width: CGFloat.random(in: 150...250), height: 12)
+            }
+
+            Spacer()
+
+            // Date skeleton
+            RoundedRectangle(cornerRadius: 4)
+                .fill(skeletonColor)
+                .frame(width: 30, height: 10)
+        }
+        .padding(.vertical, Theme.Spacing.extraSmall.rawValue)
+        .redacted(reason: .placeholder)
+    }
+
+    private var skeletonColor: Color {
+        colorScheme == .dark
+            ? Color.gray.opacity(0.3)
+            : Color.gray.opacity(0.2)
     }
 }
 

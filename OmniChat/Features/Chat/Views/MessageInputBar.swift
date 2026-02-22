@@ -103,6 +103,8 @@ struct MessageInputBar: View {
                 .buttonStyle(.plain)
                 .disabled(isStreaming)
                 .help("Add attachment")
+                .accessibilityLabel("Add attachment")
+                .accessibilityHint("Opens file picker to add images or documents")
             }
 
             // Text input area with model pill
@@ -140,10 +142,14 @@ struct MessageInputBar: View {
             .disabled(shouldDisableSend)
             .keyboardShortcut(.defaultAction) // Cmd+Enter on Mac, Enter on iOS
             .help(isStreaming ? "Stop generating" : "Send message")
+            .accessibilityLabel(isStreaming ? "Stop generating" : "Send message")
+            .accessibilityHint(isStreaming ? "Stops the current AI generation" : "Sends your message to the AI")
         }
         .padding(.horizontal, Theme.Spacing.medium.rawValue)
         .padding(.vertical, Theme.Spacing.small.rawValue)
         .background(Theme.Colors.secondaryBackground)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Message composition")
     }
 
     // MARK: - Subviews
@@ -175,6 +181,8 @@ struct MessageInputBar: View {
         .buttonStyle(.plain)
         .disabled(isStreaming)
         .help("Tap to switch model")
+        .accessibilityLabel("Current model: \(modelName)")
+        .accessibilityHint("Double tap to switch to a different AI model")
     }
 
     // MARK: - Computed Properties

@@ -23,6 +23,9 @@ import SwiftData
 /// - Dense spacing: 4-6pt between messages (Raycast-style)
 /// - Toolbar with model switcher pill and provider badge
 /// - Streaming indicator during AI response generation
+/// - Message appearance animations (fade in + slide up)
+/// - Error banner with retry functionality
+/// - Haptic feedback on send and error (iOS)
 ///
 /// The view observes the conversation's messages via SwiftData relationship and updates
 /// automatically when new messages are added (including during streaming).
@@ -34,6 +37,12 @@ struct ChatView: View {
 
     /// The provider manager for accessing AI providers.
     @State private var providerManager: ProviderManager?
+
+    /// The chat view model for managing chat state.
+    @State private var viewModel: ChatViewModel?
+
+    /// The current error to display in the banner.
+    @State private var currentError: ProviderError?
 
     // MARK: - Environment
 
@@ -109,6 +118,20 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Error banner (shown when there's an error)
+            if let error = currentError {
+                ErrorBannerView(
+                    error: error,
+                    onRetry: {
+                        retryLastMessage()
+                    },
+                    onDismiss: {
+                        currentError = nil
+                    }
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             // Message list
             messageListView
 
@@ -126,6 +149,17 @@ struct ChatView: View {
             // Initialize provider manager if not already set
             if providerManager == nil {
                 providerManager = ProviderManager(modelContext: modelContext)
+            }
+            // Initialize view model
+            if viewModel == nil, let manager = providerManager {
+                viewModel = ChatViewModel(modelContext: modelContext, providerManager: manager)
+                viewModel?.currentConversation = conversation
+            }
+        }
+        .onChange(of: viewModel?.error) { _, newError in
+            // Update local error state when view model error changes
+            if let error = newError {
+                currentError = error
             }
         }
     }
@@ -219,6 +253,8 @@ struct ChatView: View {
             .buttonStyle(.borderedProminent)
         }
         .offset(y: -40) // Shift up slightly for better visual balance
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - Streaming Indicator
@@ -232,6 +268,8 @@ struct ChatView: View {
         .background(Theme.Colors.assistantMessageBackground)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("AI is generating response")
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     // MARK: - Input Bar View
@@ -248,6 +286,11 @@ struct ChatView: View {
             }
             .buttonStyle(.plain)
             .disabled(isStreaming)
+            .accessibilityLabel("Add attachment")
+            .accessibilityHint("Opens file picker to add attachments")
+            #if os(macOS)
+            .help("Add attachment")
+            #endif
 
             // Text input
             HStack(alignment: .bottom, spacing: Theme.Spacing.small.rawValue) {
@@ -280,10 +323,14 @@ struct ChatView: View {
             .buttonStyle(.plain)
             .disabled(inputText.isEmpty || isStreaming)
             .keyboardShortcut(.defaultAction) // Cmd+Enter on Mac
+            .accessibilityLabel(isStreaming ? "Generating response" : "Send message")
+            .accessibilityHint(inputText.isEmpty ? "Type a message to send" : "Sends your message")
         }
         .padding(.horizontal, Theme.Spacing.medium.rawValue)
         .padding(.vertical, Theme.Spacing.small.rawValue)
         .background(Theme.Colors.secondaryBackground)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Message input bar")
     }
 
     // MARK: - Model Pill View
@@ -391,7 +438,13 @@ struct ChatView: View {
         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard !isStreaming else { return }
 
+        // Trigger haptic feedback on send
+        triggerSendHaptic()
+
         let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Clear any existing error
+        currentError = nil
 
         // Create user message
         let userMessage = Message(
@@ -427,6 +480,35 @@ struct ChatView: View {
             }
         }
     }
+
+    /// Retries the last message (used by error banner).
+    private func retryLastMessage() {
+        currentError = nil
+
+        // Find last user message and re-send
+        let messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
+        guard let lastUserMessage = messages.last(where: { $0.role == .user }) else { return }
+
+        // Delete last assistant message if exists
+        if let lastAssistantMessage = messages.last(where: { $0.role == .assistant }) {
+            modelContext.delete(lastAssistantMessage)
+        }
+
+        // Re-send
+        inputText = lastUserMessage.content
+        sendMessage()
+    }
+
+    // MARK: - Haptic Feedback
+
+    #if os(iOS)
+    /// Triggers light impact haptic feedback (for send action).
+    private func triggerSendHaptic() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+    #else
+    private func triggerSendHaptic() {}
+    #endif
 }
 
 // MARK: - Typing Indicator
@@ -456,6 +538,7 @@ private struct TypingIndicator: View {
         .onDisappear {
             isAnimating = false
         }
+        .accessibilityHidden(true) // Decorative element, parent has label
     }
 }
 

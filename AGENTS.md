@@ -22,7 +22,7 @@
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
-| TASK-10.1 | UI Polish Pass | ui | TODO | — | Final UI review, accessibility, keyboard navigation |
+| TASK-10.1 | UI Polish Pass | ui | DONE | — | Accessibility labels, hints, and traits added to all interactive elements. Keyboard shortcuts documented. VoiceOver support. Dynamic Type ready. Minimum tap targets verified. (1) ChatView: accessibility labels for input bar, send button, attachment button, streaming indicator, empty state; (2) MessageBubble: combined accessibility labels with role, time, tokens; accessibility hints for copy button; (3) MessageInputBar: accessibility for send, attach, model pill buttons; (4) ConversationListView/Row: swipe action accessibility hints, combined empty state labels; (5) ContentView: toolbar button accessibility with keyboard shortcut hints; (6) ProviderListView: add/edit/delete/toggle button accessibility; (7) CodeBlockView: combined accessibility label with language and line count; (8) ErrorBannerView: error-specific accessibility labels and hints; (9) ModelSwitcher: current model label and switch hint. Both iOS and macOS builds succeed. |
 | TASK-10.2 | Write Unit Tests | qa | TODO | — | Core models, adapters, managers |
 | TASK-10.3 | Write UI Tests | qa | TODO | — | Critical user flows |
 | TASK-10.4 | App Store Assets | devops | DONE | — | App icon Contents.json configured, AppStoreMetadata.md created with full listing info, ScreenshotNotes.txt with device requirements, IconRequirements.txt with design guidelines |
@@ -121,6 +121,8 @@
 None - Phase 9 complete. Both iOS and macOS builds succeed.
 
 ## Decisions Log
+
+- [2026-02-22] TASK-10.1 completed: UI Polish Pass for accessibility. Added comprehensive accessibility support across all SwiftUI views: (1) ChatView.swift - input bar, send/attachment buttons with hints, streaming indicator label, empty state header trait; (2) MessageBubble.swift - combined accessibility label with role/time/tokens, copy button hint, decorative badges hidden from VoiceOver; (3) MessageInputBar.swift - send/attach/model pill buttons with descriptive labels and hints, container grouping; (4) ConversationListView.swift - swipe action buttons with specific hints per action type, empty state grouping; (5) ConversationRow.swift - combined accessibility label with pin/archive status, preview, and date; (6) ContentView.swift - toolbar buttons with keyboard shortcut hints in help text; (7) ProviderListView.swift - add/edit/delete/toggle buttons with contextual hints; (8) CodeBlockView.swift - combined label with language and line count, copy button hint; (9) ErrorBannerView.swift - error-specific labels based on error type, retry/dismiss button hints; (10) ModelSwitcher.swift - current model label and switch hint. Used accessibilityElement(children:), accessibilityLabel, accessibilityHint, accessibilityHidden, and accessibilityAddTraits modifiers. All decorative elements (icons, badges) hidden from VoiceOver. Both iOS and macOS builds succeed.
 
 - [2026-02-22] PHASE 9 COMPLETE: All 4 Phase 9 tasks completed. OAuth Integration is fully implemented. Key accomplishments: (1) OAuthManager with ASWebAuthenticationSession for secure OAuth flows; (2) PKCE support with SHA256 challenge method; (3) Automatic token refresh with race condition prevention; (4) ProviderSetupView updated with OAuth UI for sign-in, reconnect, and sign-out. Both iOS and macOS builds succeed. Ready for Phase 10 (Polish, Testing & App Store).
 

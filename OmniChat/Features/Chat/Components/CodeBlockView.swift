@@ -74,6 +74,18 @@ struct CodeBlockView: View {
             RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue)
                 .stroke(Theme.Colors.border, lineWidth: 0.5)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint("Code block. Use copy button to copy code.")
+    }
+
+    // MARK: - Accessibility
+
+    /// Computed accessibility label for VoiceOver.
+    private var accessibilityLabel: String {
+        let languageLabel = normalizedLanguage ?? "code"
+        let lineCount = code.components(separatedBy: .newlines).count
+        return "\(languageLabel) code block, \(lineCount) lines"
     }
 
     // MARK: - Subviews
@@ -108,6 +120,8 @@ struct CodeBlockView: View {
             }
             .buttonStyle(.plain)
             .disabled(showCopied)
+            .accessibilityLabel(showCopied ? "Code copied" : "Copy code")
+            .accessibilityHint("Copies the code to clipboard")
         }
         .padding(.horizontal, Theme.Spacing.medium.rawValue)
         .padding(.vertical, Theme.Spacing.small.rawValue)
@@ -166,6 +180,7 @@ struct CodeBlockView: View {
     private func copyCode() {
         #if os(iOS)
         UIPasteboard.general.string = code
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         #elseif os(macOS)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(code, forType: .string)
