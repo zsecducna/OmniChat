@@ -66,6 +66,72 @@ enum AuthMethod: String, Codable, Sendable, CaseIterable {
     }
 }
 
+/// The API format for custom providers.
+/// Determines the request/response structure used for communication.
+enum APIFormat: String, Codable, Sendable, CaseIterable {
+    /// OpenAI-compatible format (Chat Completions API)
+    case openAI
+    /// Anthropic-compatible format (Messages API)
+    case anthropic
+
+    /// Returns a human-readable display name for this API format.
+    var displayName: String {
+        switch self {
+        case .openAI:
+            return "OpenAI-Compatible"
+        case .anthropic:
+            return "Anthropic-Compatible"
+        }
+    }
+
+    /// Returns a description of this API format.
+    var description: String {
+        switch self {
+        case .openAI:
+            return "Uses OpenAI Chat Completions API format (/v1/chat/completions)"
+        case .anthropic:
+            return "Uses Anthropic Messages API format (/v1/messages)"
+        }
+    }
+
+    /// Returns the default API path for this format.
+    var defaultAPIPath: String {
+        switch self {
+        case .openAI:
+            return "/v1/chat/completions"
+        case .anthropic:
+            return "/v1/messages"
+        }
+    }
+}
+
+/// The streaming format for responses.
+enum StreamingFormat: String, Codable, Sendable, CaseIterable {
+    /// Server-Sent Events (SSE) format used by OpenAI and Anthropic
+    case sse
+    /// Newline-Delimited JSON (NDJSON) format used by Ollama
+    case ndjson
+    /// No streaming support - responses returned in full
+    case none
+
+    /// Returns a human-readable display name for this streaming format.
+    var displayName: String {
+        switch self {
+        case .sse:
+            return "Server-Sent Events (SSE)"
+        case .ndjson:
+            return "Newline-Delimited JSON (NDJSON)"
+        case .none:
+            return "No Streaming"
+        }
+    }
+
+    /// Returns whether this format supports streaming.
+    var supportsStreaming: Bool {
+        self != .none
+    }
+}
+
 /// Information about an AI model available from a provider.
 struct ModelInfo: Codable, Identifiable, Sendable, Hashable {
     var id: String
@@ -135,6 +201,28 @@ final class ProviderConfig {
     var createdAt: Date
     var updatedAt: Date
 
+    // MARK: - Custom Provider Fields
+
+    /// The API path for custom providers (e.g., "/v1/chat/completions").
+    /// If nil, uses the default path for the apiFormat.
+    var apiPath: String?
+
+    /// The raw API format value for custom providers.
+    /// Stored as String for SwiftData compatibility.
+    var apiFormatRaw: String?
+
+    /// The raw streaming format value for custom providers.
+    /// Stored as String for SwiftData compatibility.
+    var streamingFormatRaw: String?
+
+    /// The header name for API key authentication (e.g., "Authorization", "x-api-key").
+    /// Used for custom providers with apiKey auth method.
+    var apiKeyHeader: String?
+
+    /// The prefix for the API key value (e.g., "Bearer ", "").
+    /// Used for custom providers with apiKey auth method.
+    var apiKeyPrefix: String?
+
     // MARK: - Transient Properties
 
     /// The list of models available from this provider.
@@ -168,6 +256,35 @@ final class ProviderConfig {
         set {
             oauthScopesData = try? JSONEncoder().encode(newValue)
         }
+    }
+
+    /// The API format for custom providers.
+    /// Defaults to OpenAI-compatible format.
+    var apiFormat: APIFormat {
+        get {
+            guard let raw = apiFormatRaw else { return .openAI }
+            return APIFormat(rawValue: raw) ?? .openAI
+        }
+        set {
+            apiFormatRaw = newValue.rawValue
+        }
+    }
+
+    /// The streaming format for custom providers.
+    /// Defaults to SSE format.
+    var streamingFormat: StreamingFormat {
+        get {
+            guard let raw = streamingFormatRaw else { return .sse }
+            return StreamingFormat(rawValue: raw) ?? .sse
+        }
+        set {
+            streamingFormatRaw = newValue.rawValue
+        }
+    }
+
+    /// Returns the effective API path (custom or default based on apiFormat).
+    var effectiveAPIPath: String {
+        apiPath ?? apiFormat.defaultAPIPath
     }
 
     /// Returns the effective base URL (custom or default).
@@ -221,6 +338,12 @@ final class ProviderConfig {
         defaultModelID: String? = nil,
         costPerInputToken: Double? = nil,
         costPerOutputToken: Double? = nil,
+        // Custom provider fields
+        apiPath: String? = nil,
+        apiFormat: APIFormat = .openAI,
+        streamingFormat: StreamingFormat = .sse,
+        apiKeyHeader: String? = nil,
+        apiKeyPrefix: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -241,6 +364,12 @@ final class ProviderConfig {
         self.defaultModelID = defaultModelID
         self.costPerInputToken = costPerInputToken
         self.costPerOutputToken = costPerOutputToken
+        // Custom provider fields
+        self.apiPath = apiPath
+        self.apiFormatRaw = apiFormat.rawValue
+        self.streamingFormatRaw = streamingFormat.rawValue
+        self.apiKeyHeader = apiKeyHeader
+        self.apiKeyPrefix = apiKeyPrefix
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -285,7 +414,12 @@ final class ProviderConfig {
             costPerInputToken: costPerInputToken,
             costPerOutputToken: costPerOutputToken,
             effectiveBaseURL: effectiveBaseURL,
-            defaultModel: defaultModel
+            effectiveAPIPath: effectiveAPIPath,
+            defaultModel: defaultModel,
+            apiFormat: apiFormat,
+            streamingFormat: streamingFormat,
+            apiKeyHeader: apiKeyHeader,
+            apiKeyPrefix: apiKeyPrefix
         )
     }
 }
@@ -318,7 +452,14 @@ struct ProviderConfigSnapshot: Sendable {
     let costPerInputToken: Double?
     let costPerOutputToken: Double?
     let effectiveBaseURL: String?
+    let effectiveAPIPath: String
     let defaultModel: ModelInfo?
+
+    // Custom provider fields
+    let apiFormat: APIFormat
+    let streamingFormat: StreamingFormat
+    let apiKeyHeader: String?
+    let apiKeyPrefix: String?
 
     /// The keychain key for storing this provider's API key.
     var apiKeyKeychainKey: String {

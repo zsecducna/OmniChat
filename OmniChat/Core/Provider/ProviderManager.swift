@@ -160,9 +160,9 @@ final class ProviderManager {
             Self.logger.debug("Created Ollama adapter for '\(config.name)'")
 
         case .custom:
-            // Placeholder for CustomAdapter (Phase 7)
-            Self.logger.warning("Custom adapter not yet implemented")
-            throw ProviderError.notSupported("Custom adapter not yet implemented")
+            // Custom adapter supports optional authentication
+            adapter = CustomAdapter(config: snapshot, apiKey: apiKey.isEmpty ? nil : apiKey)
+            Self.logger.debug("Created Custom adapter for '\(config.name)'")
         }
 
         // Cache the adapter
