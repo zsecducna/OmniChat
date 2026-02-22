@@ -1,0 +1,168 @@
+# OmniChat App Icon Requirements
+
+**Last Updated:** 2026-02-22
+
+## Required Icon Files
+
+Place all icon files in:
+`/Users/z/Projects/OmniChat/OmniChat/Resources/Assets.xcassets/AppIcon.appiconset/`
+
+---
+
+## iOS Icon
+
+| Filename | Size | Purpose |
+|----------|------|---------|
+| AppIcon-iOS-1024.png | 1024 x 1024 px | App Store |
+
+Note: iOS app icons are automatically generated from the 1024x1024 master by Xcode.
+
+---
+
+## macOS Icons
+
+| Filename | Size | Purpose |
+|----------|------|---------|
+| AppIcon-mac-16.png | 16 x 16 px | Finder icon (1x) |
+| AppIcon-mac-16@2x.png | 32 x 32 px | Finder icon (2x / Retina) |
+| AppIcon-mac-32.png | 32 x 32 px | Finder icon (1x) |
+| AppIcon-mac-32@2x.png | 64 x 64 px | Finder icon (2x / Retina) |
+| AppIcon-mac-128.png | 128 x 128 px | Spotlight (1x) |
+| AppIcon-mac-128@2x.png | 256 x 256 px | Spotlight (2x / Retina) |
+| AppIcon-mac-256.png | 256 x 256 px | Spotlight (1x) |
+| AppIcon-mac-256@2x.png | 512 x 512 px | Spotlight (2x / Retina) |
+| AppIcon-mac-512.png | 512 x 512 px | App Store (1x) |
+| AppIcon-mac-512@2x.png | 1024 x 1024 px | App Store (2x / Retina) |
+
+---
+
+## Design Guidelines
+
+### App Icon Concept
+
+OmniChat is a universal AI chat client. Suggested visual elements:
+
+1. **Chat Bubble Theme**: Speech bubble or message iconography
+2. **Universal/Global Element**: Globe, infinity symbol, or connected nodes
+3. **AI/Brain Element**: Neural network pattern, circuit lines, or abstract brain
+4. **Color Palette**: Consider using the app's accent colors:
+   - Primary: Deep blue or purple (universality)
+   - Secondary accents: Orange (Anthropic), Green (OpenAI), Blue (Ollama)
+   - Avoid direct logos of AI providers (trademark issues)
+
+### Design Dos
+
+- Use simple, recognizable shapes
+- Ensure icon looks good at 16x16 (test this!)
+- Use high contrast for visibility
+- Consider both light and dark mode backgrounds
+- Follow Apple Human Interface Guidelines for icons
+- Use vibrant but professional colors
+- Test on various wallpapers
+
+### Design Don'ts
+
+- Do NOT use AI provider logos (Anthropic, OpenAI, etc.)
+- Do NOT include text (app name)
+- Do NOT use complex gradients at small sizes
+- Do NOT use copyrighted imagery
+- Avoid photographic images
+- Avoid thin lines that disappear at small sizes
+
+---
+
+## Technical Requirements
+
+### File Format
+- PNG format
+- No transparency (iOS App Store requirement)
+- Square aspect ratio (1:1)
+- 72 DPI (standard)
+
+### Color Profile
+- sRGB color space
+- No alpha channel for App Store icon
+- Flatten any transparency to a solid background
+
+---
+
+## Icon Generation Script
+
+You can use this shell script with ImageMagick to generate all sizes from a master 1024x1024 icon:
+
+```bash
+#!/bin/bash
+# generate-icons.sh
+# Requires ImageMagick: brew install imagemagick
+
+MASTER_ICON="master-icon-1024.png"
+OUTPUT_DIR="../OmniChat/Resources/Assets.xcassets/AppIcon.appiconset"
+
+# Check if master icon exists
+if [ ! -f "$MASTER_ICON" ]; then
+    echo "Error: $MASTER_ICON not found"
+    echo "Create a 1024x1024 PNG icon first"
+    exit 1
+fi
+
+# iOS
+echo "Generating iOS icon..."
+convert "$MASTER_ICON" -resize 1024x1024 "$OUTPUT_DIR/AppIcon-iOS-1024.png"
+
+# macOS sizes
+echo "Generating macOS icons..."
+convert "$MASTER_ICON" -resize 16x16 "$OUTPUT_DIR/AppIcon-mac-16.png"
+convert "$MASTER_ICON" -resize 32x32 "$OUTPUT_DIR/AppIcon-mac-16@2x.png"
+convert "$MASTER_ICON" -resize 32x32 "$OUTPUT_DIR/AppIcon-mac-32.png"
+convert "$MASTER_ICON" -resize 64x64 "$OUTPUT_DIR/AppIcon-mac-32@2x.png"
+convert "$MASTER_ICON" -resize 128x128 "$OUTPUT_DIR/AppIcon-mac-128.png"
+convert "$MASTER_ICON" -resize 256x256 "$OUTPUT_DIR/AppIcon-mac-128@2x.png"
+convert "$MASTER_ICON" -resize 256x256 "$OUTPUT_DIR/AppIcon-mac-256.png"
+convert "$MASTER_ICON" -resize 512x512 "$OUTPUT_DIR/AppIcon-mac-256@2x.png"
+convert "$MASTER_ICON" -resize 512x512 "$OUTPUT_DIR/AppIcon-mac-512.png"
+convert "$MASTER_ICON" -resize 1024x1024 "$OUTPUT_DIR/AppIcon-mac-512@2x.png"
+
+echo "Done! Icons generated in $OUTPUT_DIR"
+```
+
+---
+
+## Alternative: SF Symbols
+
+For a quick placeholder, consider using an SF Symbol as a base:
+
+1. Open SF Symbols app on Mac
+2. Find a suitable symbol (e.g., "bubble.left.and.bubble.right.fill" or "brain")
+3. Export as SVG at large size
+4. Customize colors and add background
+5. Export final 1024x1024 PNG
+
+---
+
+## Online Icon Generators
+
+If you don't have design software, consider:
+- **AppIconGenerator**: https://www.appicongenerator.com/
+- **MakeAppIcon**: https://makeappicon.com/
+- **FlatIcon**: https://www.flaticon.com/ (for base icons)
+
+---
+
+## Verification
+
+After adding icons, verify in Xcode:
+1. Open Assets.xcassets
+2. Select AppIcon
+3. Check for warnings (missing sizes show yellow warning)
+4. Build and run to verify icon appears on device
+
+---
+
+## Checklist
+
+- [ ] Create master 1024x1024 icon
+- [ ] Generate all required sizes
+- [ ] Add to Assets.xcassets/AppIcon.appiconset
+- [ ] Verify no Xcode warnings
+- [ ] Test on simulator/device
+- [ ] Verify icon appears in App Store Connect preview

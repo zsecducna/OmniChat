@@ -1,0 +1,236 @@
+# OmniChat App Store Screenshot Requirements
+
+**Last Updated:** 2026-02-22
+
+This document outlines all required screenshots for App Store submission.
+Actual screenshots must be captured from real devices or simulators.
+
+---
+
+## Required Device Sizes
+
+### 1. iPhone 6.7" (iPhone 15 Pro Max / 16 Pro Max)
+- Resolution: 1290 x 2796 pixels
+- Minimum: 3 screenshots
+- Recommended: 5-6 screenshots
+- File format: PNG or JPEG
+- Portrait orientation preferred
+
+### 2. iPhone 6.5" (iPhone 14 Plus / 15 Plus)
+- Resolution: 1284 x 2778 pixels
+- Minimum: 3 screenshots
+- Recommended: 5-6 screenshots
+- File format: PNG or JPEG
+- Portrait orientation preferred
+
+### 3. iPad Pro 13" (M4) or iPad Pro 12.9" (6th Gen)
+- Resolution: 2048 x 2732 pixels (12.9") or 2064 x 2752 (13" M4)
+- Minimum: 3 screenshots
+- Recommended: 5-6 screenshots
+- File format: PNG or JPEG
+- Portrait or landscape (choose one orientation for all)
+
+### 4. macOS
+- Resolution: 1280 x 800 pixels minimum, 2560 x 1600 recommended
+- Minimum: 3 screenshots
+- Recommended: 5-6 screenshots
+- File format: PNG or JPEG
+- Landscape orientation only
+
+---
+
+## Suggested Screenshots
+
+### Screenshot 1: Conversation List (Empty State or with Chats)
+**Purpose:** Show the clean, dense conversation list
+**Content:**
+- Conversation list sidebar on iPad/Mac
+- Full-screen list on iPhone
+- Show pinned conversation
+- Show provider badges (colored dots)
+- Show search bar
+
+**Caption:** "All your AI conversations in one place"
+
+---
+
+### Screenshot 2: Active Chat with Streaming Response
+**Purpose:** Demonstrate real-time streaming
+**Content:**
+- Chat view with user message
+- AI response being streamed (show partial response)
+- Provider/model indicator
+- Dense message layout
+
+**Caption:** "Real-time streaming from Claude, GPT, and more"
+
+---
+
+### Screenshot 3: Code Block with Syntax Highlighting
+**Purpose:** Show developer-friendly features
+**Content:**
+- Chat with code response
+- Syntax-highlighted code block
+- Copy button visible
+- Language label
+
+**Caption:** "Beautiful syntax highlighting for code"
+
+---
+
+### Screenshot 4: Provider Configuration
+**Purpose:** Show multi-provider support
+**Content:**
+- Settings > Providers screen
+- Show 2-3 configured providers (Anthropic, OpenAI, Ollama)
+- Provider type icons visible
+- Enabled/disabled states
+
+**Caption:** "Connect to Claude, ChatGPT, Ollama, and custom APIs"
+
+---
+
+### Screenshot 5: Model Switcher / Persona Picker
+**Purpose:** Show flexibility and customization
+**Content:**
+- Model picker dropdown/popover
+- Multiple models listed with vision indicators
+- Or persona picker showing available personas
+
+**Caption:** "Switch models or personas instantly"
+
+---
+
+### Screenshot 6: Usage Dashboard (iPad/Mac only)
+**Purpose:** Show power-user features
+**Content:**
+- Usage statistics view
+- Token counts and cost estimates
+- Charts (bar chart, pie chart)
+- Provider breakdown
+
+**Caption:** "Track your AI usage and costs"
+
+---
+
+## iPad/Mac Specific Screenshots
+
+### Split View (iPad only)
+- Show NavigationSplitView with sidebar and detail
+- Demonstrates the two-column layout
+
+### macOS Window
+- Show full window with sidebar
+- macOS-specific elements (traffic lights, toolbar)
+
+---
+
+## Screenshot Do's and Don'ts
+
+### Do:
+- Use realistic, meaningful content
+- Show diverse AI responses (code, text, markdown)
+- Include provider diversity (show Claude and GPT in same screenshot set)
+- Use dark mode for developer appeal (or provide both)
+- Keep UI clean - no debug overlays
+- Capture at native resolution
+
+### Don't:
+- Include personal API keys or sensitive data
+- Show placeholder text like "Lorem ipsum"
+- Use sample conversations with inappropriate content
+- Include screenshots with errors or loading states
+- Show empty states unless intentionally demonstrating them
+
+---
+
+## Capturing Screenshots
+
+### iOS Simulator Method:
+```bash
+# Boot appropriate simulator
+xcrun simctl boot "iPhone 15 Pro Max"
+open -a Simulator
+
+# Take screenshot (Cmd+S in Simulator app)
+# Or use:
+xcrun simctl io booted screenshot screenshot.png
+```
+
+### Xcode Method:
+1. Run app on simulator
+2. Debug > View Debugging > Capture View Hierarchy (optional for consistency)
+3. Take screenshot with Cmd+S
+4. Screenshots saved to Desktop
+
+### Device Method (recommended for final):
+1. Run on physical device
+2. Press Power + Volume Up simultaneously
+3. Transfer to Mac via AirDrop or Photos app
+
+### macOS Method:
+```bash
+# Full window screenshot
+Cmd+Shift+4, then Space, then click window
+
+# Or use screencapture command
+screencapture -l$(osascript -e 'tell app "OmniChat" to id of window 1') screenshot.png
+```
+
+---
+
+## Screenshot Naming Convention
+
+Store captured screenshots in this folder with names like:
+- `iPhone_6.7_Screenshot1_ConversationList.png`
+- `iPhone_6.7_Screenshot2_StreamingChat.png`
+- `iPhone_6.7_Screenshot3_CodeBlock.png`
+- `iPad_12.9_Screenshot1_SplitView.png`
+- `macOS_Screenshot1_FullWindow.png`
+
+---
+
+## App Store Connect Upload
+
+1. Navigate to App Store Connect > App > Screenshots
+2. Drag and drop screenshots for each device type
+3. App Store Connect will auto-scale if needed (but prefer native sizes)
+4. Add localized captions if supporting multiple languages
+
+---
+
+## Screenshot Size Validation
+
+Before uploading, verify dimensions:
+
+```bash
+# Check image dimensions
+sips -g pixelWidth -g pixelHeight screenshot.png
+
+# Batch resize if needed
+sips -z 2796 1290 screenshot.png
+```
+
+---
+
+## Marketing Use
+
+The same screenshots can be used for:
+- App Store listing
+- Website
+- Press kit
+- Social media (may need different aspect ratios)
+
+Consider creating additional marketing-focused images:
+- Feature highlight graphics
+- Comparison charts
+- Provider logos montage
+
+---
+
+## Notes
+
+- Screenshots can be updated without a new app version
+- Test screenshots on various devices in App Store preview
+- Consider A/B testing different screenshot sets
+- Localized screenshots improve conversion in non-English markets

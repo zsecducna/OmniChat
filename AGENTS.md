@@ -1,8 +1,8 @@
 # OmniChat Agent Task Board
 
-## Current Phase: Phase 9 — OAuth Integration
+## Current Phase: Phase 10 — Polish, Testing & App Store
 
-## Phase 0, 1, 2, 3, 4, 5, 6, 7 & 8 Summary (COMPLETE)
+## Phase 0, 1, 2, 3, 4, 5, 6, 7, 8 & 9 Summary (COMPLETE)
 - **Phase 0**: Xcode project, dependencies, directory structure, SwiftData container, design system
 - **Phase 1**: SwiftData models, KeychainManager, AIProvider protocol, HTTPClient, SSEParser, AnthropicAdapter, OpenAIAdapter, ProviderManager
 - **Phase 2**: ContentView, ConversationListView, ChatView, MessageBubble, MessageInputBar, ChatViewModel, StreamingTextView
@@ -12,12 +12,24 @@
 - **Phase 6**: CloudKit configuration, Sync conflicts, Attachment thumbnails, UI polish
 - **Phase 7**: OllamaAdapter, CustomAdapter, ProviderSetupView for Ollama/Custom
 - **Phase 8**: UsageRecord queries, UsageDashboardView, CostCalculator
+- **Phase 9**: OAuthManager, PKCE, Token Refresh, ProviderSetupView OAuth
 
 ---
 
 ## Task Status
 
-### Phase 9 Tasks
+### Phase 10 Tasks
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-10.1 | UI Polish Pass | ui | TODO | — | Final UI review, accessibility, keyboard navigation |
+| TASK-10.2 | Write Unit Tests | qa | TODO | — | Core models, adapters, managers |
+| TASK-10.3 | Write UI Tests | qa | TODO | — | Critical user flows |
+| TASK-10.4 | App Store Assets | devops | DONE | — | App icon Contents.json configured, AppStoreMetadata.md created with full listing info, ScreenshotNotes.txt with device requirements, IconRequirements.txt with design guidelines |
+| TASK-10.5 | App Store Configuration | devops | TODO | — | Bundle ID, signing, entitlements |
+| TASK-10.6 | Documentation | pm | TODO | — | README, SETUP_GUIDE updates |
+
+### Phase 9 Tasks (COMPLETE)
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
@@ -106,9 +118,11 @@
 
 ## Blockers
 
-None - Phase 8 complete. Both iOS and macOS builds succeed.
+None - Phase 9 complete. Both iOS and macOS builds succeed.
 
 ## Decisions Log
+
+- [2026-02-22] PHASE 9 COMPLETE: All 4 Phase 9 tasks completed. OAuth Integration is fully implemented. Key accomplishments: (1) OAuthManager with ASWebAuthenticationSession for secure OAuth flows; (2) PKCE support with SHA256 challenge method; (3) Automatic token refresh with race condition prevention; (4) ProviderSetupView updated with OAuth UI for sign-in, reconnect, and sign-out. Both iOS and macOS builds succeed. Ready for Phase 10 (Polish, Testing & App Store).
 
 - [2026-02-22] PHASE 8 COMPLETE: All 3 Phase 8 tasks completed. Token Tracking & Usage Dashboard is fully implemented. Key accomplishments: (1) UsageRecord enhanced with query methods (fetchByDateRange, fetchByProvider, fetchByConversation, fetchTotalUsage, fetchDailyUsage) and aggregate statistics (UsageStatistics, ProviderUsageStats, ModelUsageStats, DailyUsageStats); (2) UsageDashboardView with SwiftUI Charts showing daily usage bar charts, provider pie charts, model breakdown, and recent activity list; (3) CostCalculator with model-specific pricing for all major AI models (Claude, GPT, Ollama). Both iOS and macOS builds succeed. Ready for Phase 9 (OAuth Integration).
 - [2026-02-22] PHASE 7 COMPLETE: All 3 Phase 7 tasks completed. Ollama & Custom Providers are now supported. Key accomplishments: (1) OllamaAdapter with NDJSON streaming, local server support, no auth; (2) CustomAdapter with configurable API format (OpenAI/Anthropic), streaming format (SSE/NDJSON/None), custom headers; (3) ProviderSetupView updated with Ollama/Custom provider configuration UI. Both iOS and macOS builds succeed. Ready for Phase 8 (Token Tracking & Usage Dashboard).
