@@ -13,6 +13,7 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
     case anthropic
     case openai
     case ollama
+    case zhipu
     case custom
 
     /// Returns the default base URL for this provider type.
@@ -24,6 +25,8 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "https://api.openai.com"
         case .ollama:
             return "http://localhost:11434"
+        case .zhipu:
+            return "https://api.z.ai/api/paas/v4"
         case .custom:
             return nil
         }
@@ -38,6 +41,8 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "OpenAI"
         case .ollama:
             return "Ollama"
+        case .zhipu:
+            return "Z.AI"
         case .custom:
             return "Custom"
         }
@@ -181,15 +186,15 @@ struct ModelInfo: Codable, Identifiable, Sendable, Hashable {
 /// Use ProviderConfigSnapshot when you need a Sendable copy of the configuration.
 @Model
 final class ProviderConfig {
-    var id: UUID
-    var name: String
-    var providerType: ProviderType
-    var isEnabled: Bool
-    var isDefault: Bool
-    var sortOrder: Int
+    var id: UUID = UUID()
+    var name: String = ""
+    var providerType: ProviderType = ProviderType.custom
+    var isEnabled: Bool = true
+    var isDefault: Bool = false
+    var sortOrder: Int = 0
     var baseURL: String?
     var customHeadersData: Data?
-    var authMethod: AuthMethod
+    var authMethod: AuthMethod = AuthMethod.apiKey
     var oauthClientID: String?
     var oauthAuthURL: String?
     var oauthTokenURL: String?
@@ -198,8 +203,8 @@ final class ProviderConfig {
     var defaultModelID: String?
     var costPerInputToken: Double?
     var costPerOutputToken: Double?
-    var createdAt: Date
-    var updatedAt: Date
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
 
     // MARK: - Custom Provider Fields
 

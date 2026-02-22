@@ -569,6 +569,8 @@ struct UsageDashboardView: View {
             return Theme.Colors.openaiAccent
         case "ollama":
             return Theme.Colors.ollamaAccent
+        case "zhipu", "z.ai", "zhipuai":
+            return Theme.Colors.zhipuAccent
         default:
             return Theme.Colors.customAccent
         }
@@ -582,6 +584,8 @@ struct UsageDashboardView: View {
             return "GPT"
         case "ollama":
             return "Ollama"
+        case "zhipu", "z.ai", "zhipuai":
+            return "Z.AI"
         default:
             return "Custom"
         }
@@ -747,6 +751,8 @@ private struct UsageRecordRow: View {
             return Theme.Colors.openaiAccent
         } else if lowercased.contains("llama") || lowercased.contains("mistral") {
             return Theme.Colors.ollamaAccent
+        } else if lowercased.contains("glm") || lowercased.contains("zhipu") {
+            return Theme.Colors.zhipuAccent
         }
         return Theme.Colors.customAccent
     }

@@ -159,6 +159,9 @@ enum Theme {
         /// Ollama accent color (blue)
         static let ollamaAccent = Color(hex: "0969DA")
 
+        /// Z.AI/ZhipuAI accent color (teal)
+        static let zhipuAccent = Color(hex: "00BFA5")
+
         /// Custom provider accent color (purple)
         static let customAccent = Color(hex: "8B5CF6")
 
@@ -215,6 +218,8 @@ enum Theme {
                 return openaiAccent
             case "ollama":
                 return ollamaAccent
+            case "zhipu", "z.ai", "zhipuai", "glm":
+                return zhipuAccent
             default:
                 return customAccent
             }

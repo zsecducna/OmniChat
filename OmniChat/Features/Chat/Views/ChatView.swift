@@ -422,6 +422,7 @@ struct ChatView: View {
         case .anthropic: return "brain"
         case .openai: return "cpu"
         case .ollama: return "terminal"
+        case .zhipu: return "sparkles"
         case .custom: return "gearshape.2"
         }
     }
@@ -431,6 +432,7 @@ struct ChatView: View {
         case .anthropic: return Theme.Colors.anthropicAccent
         case .openai: return Theme.Colors.openaiAccent
         case .ollama: return Theme.Colors.ollamaAccent
+        case .zhipu: return Theme.Colors.zhipuAccent
         case .custom: return Theme.Colors.customAccent
         }
     }

@@ -168,6 +168,9 @@ struct ProviderSetupView: View {
     /// Whether we're editing an existing provider.
     private var isEditing: Bool { provider != nil }
 
+    /// Logger for ProviderSetupView operations.
+    private static let logger = Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
+
     // MARK: - Body
 
     var body: some View {
@@ -340,7 +343,7 @@ struct ProviderSetupView: View {
             }
 
             switch providerType {
-            case .anthropic, .openai:
+            case .anthropic, .openai, .zhipu:
                 switch selectedAuthMethod {
                 case .apiKey:
                     apiKeySection
@@ -582,7 +585,7 @@ struct ProviderSetupView: View {
     /// Whether the OAuth configuration is valid for starting a flow.
     private var oauthConfigIsValid: Bool {
         switch providerType {
-        case .anthropic, .openai:
+        case .anthropic, .openai, .zhipu:
             // Built-in providers have hardcoded OAuth configs
             return true
         case .custom:
@@ -1165,7 +1168,7 @@ struct ProviderSetupView: View {
 
     private var canProceedFromAuthStep: Bool {
         switch providerType {
-        case .anthropic, .openai:
+        case .anthropic, .openai, .zhipu:
             switch selectedAuthMethod {
             case .apiKey:
                 return isValidated
@@ -1195,7 +1198,7 @@ struct ProviderSetupView: View {
         switch providerType {
         case .custom:
             return true
-        case .anthropic, .openai:
+        case .anthropic, .openai, .zhipu:
             // Future-proof: these may support OAuth in the future
             return false
         case .ollama:
@@ -1206,7 +1209,7 @@ struct ProviderSetupView: View {
     /// Available authentication methods for the current provider type.
     private var availableAuthMethods: [AuthMethod] {
         switch providerType {
-        case .anthropic, .openai:
+        case .anthropic, .openai, .zhipu:
             return [.apiKey]
         case .ollama:
             return [.none]
@@ -1461,7 +1464,7 @@ struct ProviderSetupView: View {
         case .apiKey:
             // Load API key from Keychain
             switch providerType {
-            case .anthropic, .openai, .custom:
+            case .anthropic, .openai, .zhipu, .custom:
                 if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
                     apiKey = key
                     isValidated = true
@@ -1727,7 +1730,7 @@ struct ProviderSetupView: View {
                 )
 
                 switch providerType {
-                case .anthropic, .openai:
+                case .anthropic, .openai, .zhipu:
                     let adapter = try getAdapter(for: tempConfig, apiKey: apiKey)
                     logger.debug("Calling adapter.fetchModels() for \(self.providerType.rawValue)")
                     let models = try await adapter.fetchModels()
@@ -1896,7 +1899,7 @@ struct ProviderSetupView: View {
         // Determine auth method based on provider type and selection
         let authMethod: AuthMethod
         switch providerType {
-        case .anthropic, .openai:
+        case .anthropic, .openai, .zhipu:
             authMethod = selectedAuthMethod == .oauth ? .oauth : .apiKey
         case .ollama:
             authMethod = .none
@@ -1966,19 +1969,23 @@ struct ProviderSetupView: View {
             if !apiKey.isEmpty {
                 do {
                     try KeychainManager.shared.saveAPIKey(apiKey, providerID: config.id)
+                    Self.logger.info("Successfully saved API key for '\(config.name)' (providerID: \(config.id), key length: \(apiKey.count))")
                 } catch {
-                    os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
-                        .error("Failed to save API key: \(error.localizedDescription)")
+                    Self.logger.error("Failed to save API key for '\(config.name)' (providerID: \(config.id)): \(error.localizedDescription)")
                 }
+            } else {
+                Self.logger.warning("Skipping API key save for '\(config.name)' - key is empty")
             }
 
         case .oauth:
             // OAuth tokens are already saved during the OAuth flow
             // No additional action needed here
+            Self.logger.info("OAuth auth method - tokens saved separately during OAuth flow")
             break
 
         case .none:
             // No credentials to save
+            Self.logger.info("No credentials to save for '\(config.name)' (authMethod: none)")
             break
         }
 
@@ -2069,6 +2076,8 @@ struct ProviderSetupView: View {
             return AnthropicAdapter(config: config, apiKey: apiKey)
         case .openai:
             return try OpenAIAdapter(config: config, apiKey: apiKey)
+        case .zhipu:
+            return try ZhipuAdapter(config: config, apiKey: apiKey)
         case .ollama, .custom:
             throw ProviderError.notSupported("Provider type not yet supported for validation")
         }
@@ -2102,6 +2111,12 @@ struct ProviderSetupView: View {
                 ModelInfo(id: "codellama", displayName: "Code Llama", contextWindow: 16000, supportsVision: false, supportsStreaming: true),
                 ModelInfo(id: "llava", displayName: "LLaVA (Vision)", contextWindow: 4000, supportsVision: true, supportsStreaming: true)
             ]
+        case .zhipu:
+            // Z.AI GLM models
+            return [
+                ModelInfo(id: "glm-5", displayName: "GLM-5", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "glm-4.7", displayName: "GLM-4.7", contextWindow: 128000, supportsVision: true, supportsStreaming: true)
+            ]
         case .custom:
             // For custom providers, user should enter models manually or fetch from API
             return [
@@ -2115,6 +2130,7 @@ struct ProviderSetupView: View {
         case .anthropic: return "brain"
         case .openai: return "cpu"
         case .ollama: return "terminal"
+        case .zhipu: return "sparkles"
         case .custom: return "gearshape.2"
         }
     }
@@ -2124,6 +2140,7 @@ struct ProviderSetupView: View {
         case .anthropic: return Theme.Colors.anthropicAccent
         case .openai: return Theme.Colors.openaiAccent
         case .ollama: return Theme.Colors.ollamaAccent
+        case .zhipu: return Theme.Colors.zhipuAccent
         case .custom: return Theme.Colors.customAccent
         }
     }
