@@ -1910,6 +1910,19 @@ struct ProviderSetupView: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
 
+        // Check if this should be the default provider (first provider or explicitly marked)
+        let shouldBeDefault: Bool
+        if let existing = provider {
+            // Editing existing provider - keep its current default status
+            shouldBeDefault = existing.isDefault
+        } else {
+            // New provider - check if there are any existing providers
+            let descriptor = FetchDescriptor<ProviderConfig>()
+            let existingCount = (try? modelContext.fetchCount(descriptor)) ?? 0
+            // If no providers exist, this one should be default
+            shouldBeDefault = existingCount == 0
+        }
+
         if let existing = provider {
             config = existing
             config.name = name
@@ -1933,6 +1946,7 @@ struct ProviderSetupView: View {
             config = ProviderConfig(
                 name: name,
                 providerType: providerType,
+                isDefault: shouldBeDefault,
                 baseURL: baseURL.isEmpty ? nil : baseURL,
                 customHeaders: headersDict,
                 authMethod: authMethod,

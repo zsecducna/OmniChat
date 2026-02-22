@@ -44,6 +44,9 @@ struct ChatView: View {
     /// The current error to display in the banner.
     @State private var currentError: ProviderError?
 
+    /// Controls presentation of the provider setup sheet.
+    @State private var showProviderSetup = false
+
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
@@ -134,8 +137,16 @@ struct ChatView: View {
             // Message list
             messageListView
 
-            // Input bar
-            inputBarView
+            // Input bar (or provider setup prompt if no provider)
+            if currentProvider != nil {
+                inputBarView
+            } else if let manager = providerManager, !manager.providers.isEmpty {
+                // Providers exist but none selected - show selection prompt
+                noProviderConfiguredView
+            } else {
+                // No providers configured - show add provider button
+                addProviderButtonView
+            }
         }
         .navigationTitle(conversation.title)
         #if os(iOS)
@@ -143,6 +154,12 @@ struct ChatView: View {
         #endif
         .toolbar {
             toolbarContent
+        }
+        .sheet(isPresented: $showProviderSetup) {
+            ProviderSetupView(provider: nil)
+                #if os(macOS)
+                .frame(minWidth: 500, minHeight: 500)
+                #endif
         }
         .task {
             // Initialize provider manager if not already set
@@ -241,7 +258,86 @@ struct ChatView: View {
 
     // MARK: - Empty State
 
+    @ViewBuilder
     private var emptyStateView: some View {
+        // Check if no providers are configured at all
+        if let manager = providerManager, manager.providers.isEmpty {
+            // No providers configured - show setup prompt
+            noProvidersEmptyStateView
+        } else if currentProvider == nil {
+            // Providers exist but none selected for this conversation
+            noProviderSelectedEmptyStateView
+        } else {
+            // Normal empty state - ready to chat
+            readyToChatEmptyStateView
+        }
+    }
+
+    /// Empty state shown when no providers are configured at all.
+    private var noProvidersEmptyStateView: some View {
+        ContentUnavailableView {
+            Label("No AI Provider", systemImage: "antenna.radiowaves.left.and.right.slash")
+        } description: {
+            Text("Add an AI provider to start chatting")
+        } actions: {
+            VStack(spacing: Theme.Spacing.small.rawValue) {
+                Button {
+                    showProviderSetup = true
+                } label: {
+                    Label("Add Provider", systemImage: "plus.circle")
+                        .font(Theme.Typography.body)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Text("Configure Anthropic Claude, OpenAI GPT, Ollama, or a custom provider")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.tertiaryText)
+            }
+        }
+        .offset(y: -40)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Empty state shown when providers exist but none is selected for this conversation.
+    private var noProviderSelectedEmptyStateView: some View {
+        ContentUnavailableView {
+            Label("Select a Provider", systemImage: "antenna.radiowaves.left.and.right")
+        } description: {
+            Text("Choose an AI provider for this conversation")
+        } actions: {
+            if let manager = providerManager, !manager.providers.isEmpty {
+                Menu {
+                    ForEach(manager.providers) { provider in
+                        Button {
+                            conversation.providerConfigID = provider.id
+                            conversation.modelID = provider.defaultModelID
+                        } label: {
+                            HStack {
+                                Image(systemName: providerIcon(for: provider.providerType))
+                                    .foregroundStyle(providerColor(for: provider.providerType))
+                                Text(provider.name)
+                                if let model = provider.defaultModel {
+                                    Text("(\(model.displayName))")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Select Provider", systemImage: "chevron.down.circle")
+                        .font(Theme.Typography.body)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .offset(y: -40)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Empty state shown when ready to chat.
+    private var readyToChatEmptyStateView: some View {
         ContentUnavailableView {
             Label("Start a Conversation", systemImage: "bubble.left.and.bubble.right")
         } description: {
@@ -258,6 +354,85 @@ struct ChatView: View {
         .offset(y: -40) // Shift up slightly for better visual balance
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+    }
+
+    /// View shown in place of input bar when no provider is configured but providers exist.
+    private var noProviderConfiguredView: some View {
+        HStack(spacing: Theme.Spacing.medium.rawValue) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.Colors.warning)
+
+            Text("No provider selected for this conversation")
+                .font(Theme.Typography.bodySecondary)
+                .foregroundStyle(Theme.Colors.secondaryText)
+
+            Spacer()
+
+            if let manager = providerManager, !manager.providers.isEmpty {
+                Menu {
+                    ForEach(manager.providers) { provider in
+                        Button {
+                            conversation.providerConfigID = provider.id
+                            conversation.modelID = provider.defaultModelID
+                        } label: {
+                            HStack {
+                                Image(systemName: providerIcon(for: provider.providerType))
+                                    .foregroundStyle(providerColor(for: provider.providerType))
+                                Text(provider.name)
+                            }
+                        }
+                    }
+                } label: {
+                    Text("Select")
+                        .font(Theme.Typography.caption)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.medium.rawValue)
+        .padding(.vertical, Theme.Spacing.small.rawValue)
+        .background(Theme.Colors.secondaryBackground)
+    }
+
+    /// View shown in place of input bar when no providers are configured.
+    private var addProviderButtonView: some View {
+        Button {
+            showProviderSetup = true
+        } label: {
+            HStack(spacing: Theme.Spacing.small.rawValue) {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 16))
+                Text("Add AI Provider")
+                    .font(Theme.Typography.body)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.medium.rawValue)
+        }
+        .buttonStyle(.borderedProminent)
+        .padding(.horizontal, Theme.Spacing.medium.rawValue)
+        .padding(.vertical, Theme.Spacing.small.rawValue)
+        .background(Theme.Colors.secondaryBackground)
+    }
+
+    // MARK: - Helper Methods for Provider Icon/Color
+
+    private func providerIcon(for type: ProviderType) -> String {
+        switch type {
+        case .anthropic: return "brain"
+        case .openai: return "cpu"
+        case .ollama: return "terminal"
+        case .custom: return "gearshape.2"
+        }
+    }
+
+    private func providerColor(for type: ProviderType) -> Color {
+        switch type {
+        case .anthropic: return Theme.Colors.anthropicAccent
+        case .openai: return Theme.Colors.openaiAccent
+        case .ollama: return Theme.Colors.ollamaAccent
+        case .custom: return Theme.Colors.customAccent
+        }
     }
 
     // MARK: - Input Bar View
