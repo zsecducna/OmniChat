@@ -23,7 +23,7 @@
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
 | TASK-10.1 | UI Polish Pass | ui | DONE | — | Accessibility labels, hints, and traits added to all interactive elements. Keyboard shortcuts documented. VoiceOver support. Dynamic Type ready. Minimum tap targets verified. (1) ChatView: accessibility labels for input bar, send button, attachment button, streaming indicator, empty state; (2) MessageBubble: combined accessibility labels with role, time, tokens; accessibility hints for copy button; (3) MessageInputBar: accessibility for send, attach, model pill buttons; (4) ConversationListView/Row: swipe action accessibility hints, combined empty state labels; (5) ContentView: toolbar button accessibility with keyboard shortcut hints; (6) ProviderListView: add/edit/delete/toggle button accessibility; (7) CodeBlockView: combined accessibility label with language and line count; (8) ErrorBannerView: error-specific accessibility labels and hints; (9) ModelSwitcher: current model label and switch hint. Both iOS and macOS builds succeed. |
-| TASK-10.2 | Write Unit Tests | qa | TODO | — | Core models, adapters, managers |
+| TASK-10.2 | Write Unit Tests | qa | IN_PROGRESS | SwiftData CloudKit issue | Unit tests created for: (1) Conversation model (touch, addUsage, relationships, conflict resolution); (2) Message model (initialization, role values, attachments); (3) ProviderConfig model (provider types, auth methods, API formats, streaming formats, snapshots); (4) UsageRecord model (initialization, fetch descriptors, statistics); (5) CostCalculator (pricing lookup, cost calculation, formatting); (6) KeychainManager (CRUD operations, provider convenience methods, error handling); (7) SSEParser (event parsing, multi-line data, comments, OpenAI/Anthropic formats); (8) MarkdownParser (headings, formatting, code blocks, links, lists); (9) Attachment/AttachmentManager (MIME types, thumbnail support, file size utilities). Test infrastructure created: TestDataFactory helper, fixture files for SSE responses. Tests compile but cannot run due to SwiftData ModelContainer initialization failure when CloudKit is enabled. |
 | TASK-10.3 | Write UI Tests | qa | TODO | — | Critical user flows |
 | TASK-10.4 | App Store Assets | devops | DONE | — | App icon Contents.json configured, AppStoreMetadata.md created with full listing info, ScreenshotNotes.txt with device requirements, IconRequirements.txt with design guidelines |
 | TASK-10.5 | App Store Configuration | devops | TODO | — | Bundle ID, signing, entitlements |
@@ -117,6 +117,34 @@
 | TASK-0.5 | Design system foundation | ui | DONE | — | Theme.swift + DenseLayout.swift |
 
 ## Blockers
+
+### QA Agent Blocker: SwiftData CloudKit Initialization Failure
+
+**Issue**: Tests cannot run because the SwiftData ModelContainer fails to initialize when CloudKit integration is enabled. The error message indicates:
+```
+CloudKit integration requires that all attributes be optional, or have a default value set.
+```
+
+**Root Cause**: SwiftData models have non-optional properties without default values, which is incompatible with CloudKit sync requirements.
+
+**Location**: `OmniChat/App/OmniChatApp.swift:25` - `fatalError("Failed to initialize SwiftData ModelContainer: \(error)")`
+
+**Impact**: All unit tests that import `@testable import OmniChat` fail immediately because the app's `@main` struct initializes the ModelContainer before tests can run.
+
+**Resolution Required**: Core Agent needs to update SwiftData models to ensure all properties are either optional or have default values:
+- `Conversation.swift`
+- `Message.swift`
+- `Attachment.swift`
+- `ProviderConfig.swift`
+- `Persona.swift`
+- `UsageRecord.swift`
+
+**Workaround Options**:
+1. Core Agent: Make all non-optional properties optional or add default values
+2. DevOps Agent: Configure test target to use in-memory container without CloudKit
+3. QA Agent: Write tests that don't require importing the main app module (limited utility)
+
+---
 
 None - Phase 9 complete. Both iOS and macOS builds succeed.
 
