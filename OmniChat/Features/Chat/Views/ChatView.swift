@@ -50,9 +50,6 @@ struct ChatView: View {
     /// Controls confirmation dialog for delete.
     @State private var showDeleteConfirmation = false
 
-    /// Controls presentation of the settings sheet.
-    @State private var showSettings = false
-
     /// All personas for the persona picker.
     @Query(sort: \Persona.sortOrder) private var personas: [Persona]
 
@@ -187,12 +184,6 @@ struct ChatView: View {
             ProviderSetupView(provider: nil)
                 #if os(macOS)
                 .frame(minWidth: 500, minHeight: 500)
-                #endif
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-                #if os(macOS)
-                .frame(minWidth: 500, minHeight: 400)
                 #endif
         }
         .confirmationDialog(
@@ -603,7 +594,7 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        // Persona display in toolbar (replacing model switcher)
+        // Persona display in toolbar
         ToolbarItem(placement: .primaryAction) {
             PersonaPicker(
                 selectedPersonaID: $conversation.personaID,
@@ -613,27 +604,6 @@ struct ChatView: View {
             )
             .help("Select persona for this conversation")
         }
-
-        #if os(macOS)
-        // Mac-specific toolbar items
-        ToolbarItem(placement: .automatic) {
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .help("Settings")
-        }
-        #else
-        // iOS: Settings button in toolbar
-        ToolbarItem(placement: .secondaryAction) {
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-            }
-        }
-        #endif
     }
 
     // MARK: - Actions
