@@ -110,7 +110,7 @@ final class ChatViewModel {
     /// Messages for the current conversation, sorted by creation date.
     var messages: [Message] {
         guard let conversation = currentConversation else { return [] }
-        return conversation.messages.sorted { $0.createdAt < $1.createdAt }
+        return (conversation.messages ?? []).sorted { $0.createdAt < $1.createdAt }
     }
 
     /// The current AI provider adapter for the conversation.
@@ -121,17 +121,57 @@ final class ChatViewModel {
     var currentProvider: (any AIProvider)? {
         guard let conversation = currentConversation else {
             // No conversation, try default provider
-            return try? providerManager.defaultProvider.flatMap { try providerManager.adapter(for: $0) }
+            Self.logger.debug("No conversation set, trying default provider")
+            if let defaultConfig = providerManager.defaultProvider {
+                do {
+                    let adapter = try providerManager.adapter(for: defaultConfig)
+                    Self.logger.debug("Successfully created adapter for default provider '\(defaultConfig.name)'")
+                    return adapter
+                } catch {
+                    Self.logger.error("Failed to create adapter for default provider '\(defaultConfig.name)': \(error.localizedDescription)")
+                    return nil
+                }
+            } else {
+                Self.logger.warning("No default provider configured")
+                return nil
+            }
         }
 
         // Try to get the conversation's configured provider
-        if let providerID = conversation.providerConfigID,
-           let config = providerManager.provider(for: providerID) {
-            return try? providerManager.adapter(for: config)
+        if let providerID = conversation.providerConfigID {
+            Self.logger.debug("Conversation has providerConfigID: \(providerID)")
+            if let config = providerManager.provider(for: providerID) {
+                Self.logger.debug("Found provider config '\(config.name)' for ID")
+                do {
+                    let adapter = try providerManager.adapter(for: config)
+                    Self.logger.debug("Successfully created adapter for '\(config.name)'")
+                    return adapter
+                } catch {
+                    Self.logger.error("Failed to create adapter for '\(config.name)': \(error.localizedDescription)")
+                    return nil
+                }
+            } else {
+                Self.logger.warning("Provider not found for ID: \(providerID). Available providers: \(self.providerManager.providers.map { $0.id.uuidString })")
+            }
+        } else {
+            Self.logger.debug("Conversation has no providerConfigID set")
         }
 
         // Fall back to default provider
-        return try? providerManager.defaultProvider.flatMap { try providerManager.adapter(for: $0) }
+        Self.logger.debug("Falling back to default provider")
+        if let defaultConfig = providerManager.defaultProvider {
+            do {
+                let adapter = try providerManager.adapter(for: defaultConfig)
+                Self.logger.debug("Successfully created adapter for default provider '\(defaultConfig.name)'")
+                return adapter
+            } catch {
+                Self.logger.error("Failed to create adapter for default provider '\(defaultConfig.name)': \(error.localizedDescription)")
+                return nil
+            }
+        } else {
+            Self.logger.warning("No default provider available for fallback")
+            return nil
+        }
     }
 
     /// The provider configuration for the current conversation.
@@ -191,6 +231,21 @@ final class ChatViewModel {
         guard let conversation = currentConversation else {
             Self.logger.warning("Attempted to send message without active conversation")
             return
+        }
+
+        // Auto-assign default provider if conversation has no provider but providers exist
+        if conversation.providerConfigID == nil {
+            if let defaultProvider = providerManager.defaultProvider {
+                Self.logger.info("Auto-assigning default provider '\(defaultProvider.name)' to conversation")
+                conversation.providerConfigID = defaultProvider.id
+                if conversation.modelID == nil {
+                    conversation.modelID = defaultProvider.defaultModelID
+                }
+            } else {
+                Self.logger.error("No provider available for sending message - no providers configured")
+                error = ProviderError.notSupported("No AI provider configured. Add a provider in Settings.")
+                return
+            }
         }
 
         guard let provider = currentProvider else {
@@ -490,9 +545,9 @@ final class ChatViewModel {
     private func buildChatMessages() -> [ChatMessage] {
         guard let conversation = currentConversation else { return [] }
 
-        return conversation.messages.compactMap { message in
+        return (conversation.messages ?? []).compactMap { message in
             // Convert attachments to AttachmentPayload
-            let payloads = message.attachments.map { attachment in
+            let payloads = (message.attachments ?? []).map { attachment in
                 AttachmentPayload(
                     data: attachment.data,
                     mimeType: attachment.mimeType,

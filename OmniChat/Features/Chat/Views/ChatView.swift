@@ -172,7 +172,15 @@ struct ChatView: View {
         .toolbar {
             toolbarContent
         }
-        .sheet(isPresented: $showProviderSetup) {
+        .sheet(isPresented: $showProviderSetup, onDismiss: {
+            // Refresh providers after sheet dismisses to pick up newly added provider
+            providerManager?.reloadProviders()
+            // Auto-assign default provider to conversation if it has none
+            if conversation.providerConfigID == nil, let defaultProvider = providerManager?.defaultProvider {
+                conversation.providerConfigID = defaultProvider.id
+                conversation.modelID = defaultProvider.defaultModelID
+            }
+        }) {
             ProviderSetupView(provider: nil)
                 #if os(macOS)
                 .frame(minWidth: 500, minHeight: 500)
