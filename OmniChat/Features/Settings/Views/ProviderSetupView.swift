@@ -122,6 +122,9 @@ struct ProviderSetupView: View {
     @State private var isTestingConnection = false
     @State private var connectionTestResult: ConnectionTestResult?
 
+    /// Search text for filtering provider types.
+    @State private var providerSearchText = ""
+
     // MARK: - OAuth State
 
     /// The selected authentication method for the provider.
@@ -295,6 +298,17 @@ struct ProviderSetupView: View {
 
     // MARK: - Step 1: Type Selection
 
+    /// Filtered provider types based on search text.
+    private var filteredProviderTypes: [ProviderType] {
+        if providerSearchText.isEmpty {
+            return ProviderType.allCases
+        }
+        return ProviderType.allCases.filter { type in
+            type.displayName.localizedCaseInsensitiveContains(providerSearchText) ||
+            type.rawValue.localizedCaseInsensitiveContains(providerSearchText)
+        }
+    }
+
     private var typeSelectionStep: some View {
         Form {
             Section {
@@ -306,8 +320,13 @@ struct ProviderSetupView: View {
                 Text("A friendly name to identify this provider")
             }
 
+            Section {
+                TextField("Search providers...", text: $providerSearchText)
+                    .textFieldStyle(.roundedBorder)
+            }
+
             Section("Provider Type") {
-                ForEach(ProviderType.allCases, id: \.self) { type in
+                ForEach(filteredProviderTypes, id: \.self) { type in
                     Button {
                         providerType = type
                     } label: {
