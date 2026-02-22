@@ -20,6 +20,31 @@ Ads integration is optional and should only be added after the app is stable in 
 
 ---
 
+## New Provider Additions
+
+### Z.AI (GLM Models) — Added 2026-02-22
+
+| Component | File | Description |
+|-----------|------|-------------|
+| ProviderType | `Core/Data/Models/ProviderConfig.swift` | Added `.zhipu` case with display name "Z.AI" and default base URL `https://api.z.ai/api/paas/v4/` |
+| ZhipuAdapter | `Core/Provider/Adapters/ZhipuAdapter.swift` | Full AIProvider implementation with OpenAI-compatible API, SSE streaming, Bearer token auth, Accept-Language header |
+| ProviderManager | `Core/Provider/ProviderManager.swift` | Factory creates ZhipuAdapter for `.zhipu` type |
+| Theme | `Shared/DesignSystem/Theme.swift` | Teal accent color `#00BFA5` for Z.AI branding |
+| ProviderSetupView | `Features/Settings/Views/ProviderSetupView.swift` | Z.AI configuration UI with API key auth, model selection |
+| ChatView | `Features/Chat/Views/ChatView.swift` | Z.AI icon (sparkles) and color |
+| UsageDashboardView | `Features/Settings/Views/UsageDashboardView.swift` | Z.AI usage statistics display |
+
+**Z.AI API Details:**
+- Base URL: `https://api.z.ai/api/paas/v4/`
+- Chat Endpoint: `POST /chat/completions`
+- Auth Header: `Authorization: Bearer <API_KEY>`
+- Additional Header: `Accept-Language: en-US,en`
+- Format: OpenAI-compatible (same request/response format)
+- Streaming: SSE with `stream: true`
+- Default Models: `glm-5`, `glm-4.7` (128K context, vision support)
+
+---
+
 ## Task Status
 
 ### Phase 10 Tasks
