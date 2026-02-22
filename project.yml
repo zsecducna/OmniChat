@@ -131,3 +131,21 @@ schemes:
       targets:
         - OmniChatTests_iOS
         - OmniChatTests_macOS
+  OmniChatUITests:
+    build:
+      targets:
+        OmniChat_iOS: all
+        OmniChatUITests_iOS: all
+    test:
+      config: Debug
+      targets:
+        - OmniChatUITests_iOS
+  OmniChatUITests_macOS:
+    build:
+      targets:
+        OmniChat_macOS: all
+        OmniChatUITests_macOS: all
+    test:
+      config: Debug
+      targets:
+        - OmniChatUITests_macOS
