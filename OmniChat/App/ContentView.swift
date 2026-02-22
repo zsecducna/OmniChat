@@ -105,9 +105,19 @@ struct ContentView: View {
     // MARK: - Actions
 
     /// Creates a new conversation and selects it.
+    ///
+    /// The new conversation is configured with the default provider and model
+    /// if available. This ensures users can immediately start sending messages
+    /// without manually selecting a provider first.
     private func createNewConversation() {
         withAnimation(.easeInOut(duration: Theme.Animation.default)) {
+            let providerManager = ProviderManager(modelContext: modelContext)
+            let defaultProvider = providerManager.defaultProvider
+
             let conversation = Conversation()
+            conversation.providerConfigID = defaultProvider?.id
+            conversation.modelID = defaultProvider?.defaultModel?.id
+
             modelContext.insert(conversation)
             selectedConversation = conversation
         }
