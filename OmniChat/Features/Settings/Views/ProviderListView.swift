@@ -93,14 +93,10 @@ struct ProviderListView: View {
             #endif
         }
         .sheet(isPresented: $showAddProvider) {
-            NavigationStack {
-                ProviderSetupView(provider: nil)
-            }
+            ProviderSetupView(provider: nil)
         }
         .sheet(item: $providerToEdit) { provider in
-            NavigationStack {
-                ProviderSetupView(provider: provider)
-            }
+            ProviderSetupView(provider: provider)
         }
         .confirmationDialog(
             "Delete Provider?",

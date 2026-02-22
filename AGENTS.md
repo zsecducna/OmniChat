@@ -126,6 +126,12 @@ None - Phase 10 complete. Both iOS and macOS builds succeed. All 56 unit tests p
 
 ---
 
+## Recent Fixes
+
+- [2026-02-22] FIX: "Add Provider" screen showing blank/empty. Root cause was nested NavigationStack in ProviderListView.swift sheet modifiers. The sheets wrapped ProviderSetupView in NavigationStack, but ProviderSetupView already has its own NavigationStack in its body, causing display issues. Fixed by removing the redundant NavigationStack wrappers from both `.sheet(isPresented:)` and `.sheet(item:)` modifiers in ProviderListView.swift (lines 95-104). Both iOS and macOS builds succeed.
+
+---
+
 ## Decisions Log
 
 - [2026-02-22] UI TEST INSTALLATION ISSUE FIXED: The app was failing to install when running UI tests with error "Failed to load Info.plist from bundle". Root cause: The OmniChatUITests scheme was incorrectly configured to reference the macOS app bundle (`Debug/OmniChat.app`) instead of the iOS simulator app bundle (`Debug-iphonesimulator/OmniChat.app`). Fix: Updated project.yml to create separate schemes for iOS and macOS UI tests. The OmniChatUITests scheme now builds OmniChat_iOS and OmniChatUITests_iOS targets, and a new OmniChatUITests_macOS scheme was added for macOS tests. After regenerating the project with `xcodegen generate`, UI tests now run successfully on iOS simulator (6 passed, 7 skipped, 1 failed - unrelated to SwiftData). Note: The original issue description mentioned SwiftData model properties, but investigation showed all model properties already have default values. The actual crash was a project configuration issue, not a SwiftData model issue.
