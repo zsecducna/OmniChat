@@ -47,6 +47,12 @@ struct ChatView: View {
     /// Controls presentation of the provider setup sheet.
     @State private var showProviderSetup = false
 
+    /// Controls confirmation dialog for delete.
+    @State private var showDeleteConfirmation = false
+
+    /// All personas for the persona picker.
+    @Query(sort: \Persona.sortOrder) private var personas: [Persona]
+
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
@@ -116,6 +122,17 @@ struct ChatView: View {
         return manager.defaultProvider
     }
 
+    /// Whether the conversation is new (no messages yet) - for persona selection.
+    private var isNewConversation: Bool {
+        messages.isEmpty
+    }
+
+    /// The currently selected persona for this conversation.
+    private var selectedPersona: Persona? {
+        guard let personaID = conversation.personaID else { return nil }
+        return personas.first { $0.id == personaID }
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -160,6 +177,18 @@ struct ChatView: View {
                 #if os(macOS)
                 .frame(minWidth: 500, minHeight: 500)
                 #endif
+        }
+        .confirmationDialog(
+            "Delete Conversation?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteConversation()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete '\(conversation.title)'? This action cannot be undone.")
         }
         .task {
             // Initialize provider manager if not already set
@@ -565,18 +594,73 @@ struct ChatView: View {
             }
         }
 
+        // Persona picker (only for new conversations)
+        if isNewConversation {
+            ToolbarItem(placement: .automatic) {
+                PersonaPicker(
+                    selectedPersonaID: $conversation.personaID,
+                    personas: personas,
+                    showNoneOption: true,
+                    isCompact: true
+                )
+                .help("Select persona for this conversation")
+            }
+        }
+
         #if os(macOS)
         // Mac-specific toolbar items
         ToolbarItem(placement: .automatic) {
-            Button {
-                // Cancel streaming
-                if viewModel?.isStreaming == true {
-                    viewModel?.stopGeneration()
+            Menu {
+                // Show persona picker in menu (for all conversations, but only effective for new)
+                if isNewConversation {
+                    Section("Persona") {
+                        Button {
+                            conversation.personaID = nil
+                        } label: {
+                            HStack {
+                                Text("None")
+                                if conversation.personaID == nil {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        ForEach(personas) { persona in
+                            Button {
+                                conversation.personaID = persona.id
+                            } label: {
+                                HStack {
+                                    Image(systemName: persona.icon)
+                                    Text(persona.name)
+                                    if conversation.personaID == persona.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                }
+
+                // Delete option
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Delete Conversation", systemImage: "trash")
                 }
             } label: {
                 Image(systemName: viewModel?.isStreaming == true ? "stop.circle" : "ellipsis.circle")
             }
+            .menuIndicator(.hidden)
             .help(viewModel?.isStreaming == true ? "Stop generating" : "More options")
+        }
+        #else
+        // iOS: Delete button in toolbar
+        ToolbarItem(placement: .secondaryAction) {
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+            }
         }
         #endif
     }
@@ -629,6 +713,12 @@ struct ChatView: View {
         Task {
             await viewModel?.retryLastMessage()
         }
+    }
+
+    /// Deletes the current conversation and dismisses the view.
+    private func deleteConversation() {
+        modelContext.delete(conversation)
+        dismiss()
     }
 
     // MARK: - Haptic Feedback

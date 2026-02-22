@@ -157,18 +157,42 @@ struct ModelSwitcher: View {
     // MARK: - macOS Body
 
     #if os(macOS)
+    @ViewBuilder
     private var macOSBody: some View {
-        Menu {
-            ModelPickerMenuContent(
-                selectedProviderID: $selectedProviderID,
-                selectedModelID: $selectedModelID,
-                providerManager: providerManager
-            )
-        } label: {
-            pillContent
+        // Use popover for providers with many models, menu otherwise
+        if totalModelCount > 10 {
+            Button {
+                isShowingPicker = true
+            } label: {
+                pillContent
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isShowingPicker, arrowEdge: .bottom) {
+                ModelPickerPopover(
+                    selectedProviderID: $selectedProviderID,
+                    selectedModelID: $selectedModelID,
+                    providerManager: providerManager,
+                    isPresented: $isShowingPicker
+                )
+            }
+        } else {
+            Menu {
+                ModelPickerMenuContent(
+                    selectedProviderID: $selectedProviderID,
+                    selectedModelID: $selectedModelID,
+                    providerManager: providerManager
+                )
+            } label: {
+                pillContent
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+    }
+
+    /// Total count of all models across all providers.
+    private var totalModelCount: Int {
+        providerManager.enabledProviders.reduce(0) { $0 + $1.availableModels.count }
     }
     #endif
 
@@ -383,6 +407,112 @@ private struct ModelPickerMenuContent: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// Popover-style model picker for macOS with search support.
+@MainActor
+private struct ModelPickerPopover: View {
+    @Binding var selectedProviderID: UUID?
+    @Binding var selectedModelID: String?
+    let providerManager: ProviderManager
+    @Binding var isPresented: Bool
+
+    @State private var searchText = ""
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search field
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Theme.Colors.tertiaryText)
+                TextField("Search models", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(Theme.Typography.body)
+            }
+            .padding(Theme.Spacing.small.rawValue)
+            .background(Theme.Colors.tertiaryBackground.resolve(in: colorScheme))
+
+            Divider()
+
+            // Model list
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(groupedProviders.keys.sorted(), id: \.self) { providerType in
+                        if let providers = groupedProviders[providerType] {
+                            Section {
+                                ForEach(providers, id: \.id) { provider in
+                                    providerSection(for: provider)
+                                }
+                            } header: {
+                                Text(providerType)
+                                    .font(Theme.Typography.caption)
+                                    .foregroundStyle(Theme.Colors.secondaryText)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, Theme.Spacing.small.rawValue)
+                                    .padding(.vertical, Theme.Spacing.extraSmall.rawValue)
+                                    .background(Theme.Colors.secondaryBackground)
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 300)
+        }
+        .frame(width: 280)
+    }
+
+    @ViewBuilder
+    private func providerSection(for provider: ProviderConfig) -> some View {
+        let filteredModels = provider.availableModels.filter { model in
+            if searchText.isEmpty { return true }
+            return model.displayName.localizedCaseInsensitiveContains(searchText) ||
+                   model.id.localizedCaseInsensitiveContains(searchText)
+        }
+
+        ForEach(filteredModels, id: \.id) { model in
+            Button {
+                selectedProviderID = provider.id
+                selectedModelID = model.id
+                isPresented = false
+            } label: {
+                HStack(spacing: Theme.Spacing.small.rawValue) {
+                    Circle()
+                        .fill(Theme.Colors.accentColor(for: provider.providerType.rawValue))
+                        .frame(width: 8, height: 8)
+
+                    Text(model.displayName)
+                        .font(Theme.Typography.body)
+                        .foregroundStyle(Theme.Colors.text)
+                        .lineLimit(1)
+
+                    if model.supportsVision {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.Colors.accentColor(for: provider.providerType.rawValue).opacity(0.7))
+                    }
+
+                    Spacer()
+
+                    if selectedProviderID == provider.id && selectedModelID == model.id {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.Colors.accent)
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.small.rawValue)
+                .padding(.vertical, Theme.Spacing.extraSmall.rawValue)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var groupedProviders: [String: [ProviderConfig]] {
+        Dictionary(grouping: providerManager.enabledProviders) { provider in
+            provider.providerType.displayName
         }
     }
 }

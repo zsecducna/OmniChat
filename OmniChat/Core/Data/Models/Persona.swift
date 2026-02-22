@@ -12,14 +12,15 @@ import SwiftData
 /// Built-in personas are shipped with the app; users can also create custom ones.
 @Model
 final class Persona {
-    var id: UUID
-    var name: String
-    var systemPrompt: String
-    var icon: String
-    var isBuiltIn: Bool
-    var sortOrder: Int
-    var createdAt: Date
-    var updatedAt: Date
+    var id: UUID = UUID()
+    var name: String = ""
+    var systemPrompt: String = ""
+    var icon: String = "bubble.left"
+    var isBuiltIn: Bool = false
+    var isDefault: Bool = false
+    var sortOrder: Int = 0
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
 
     // MARK: - Initialization
 
@@ -29,6 +30,7 @@ final class Persona {
         systemPrompt: String,
         icon: String = "bubble.left",
         isBuiltIn: Bool = false,
+        isDefault: Bool = false,
         sortOrder: Int = 0,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
@@ -38,6 +40,7 @@ final class Persona {
         self.systemPrompt = systemPrompt
         self.icon = icon
         self.isBuiltIn = isBuiltIn
+        self.isDefault = isDefault
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -157,6 +160,40 @@ extension Persona {
                 // If fetch fails, insert anyway
                 context.insert(persona)
             }
+        }
+    }
+
+    /// Fetches the default persona from the given context.
+    /// - Parameter context: The SwiftData model context to fetch from
+    /// - Returns: The default persona, or nil if none is set
+    static func fetchDefault(from context: ModelContext) -> Persona? {
+        let descriptor = FetchDescriptor<Persona>(
+            predicate: #Predicate { $0.isDefault }
+        )
+        return try? context.fetch(descriptor).first
+    }
+
+    /// Sets this persona as the default, clearing the default flag from all other personas.
+    /// - Parameter context: The SwiftData model context
+    func setAsDefault(in context: ModelContext) {
+        // Clear default flag from all personas
+        let descriptor = FetchDescriptor<Persona>()
+        if let allPersonas = try? context.fetch(descriptor) {
+            for persona in allPersonas {
+                persona.isDefault = false
+            }
+        }
+        // Set this persona as default
+        isDefault = true
+        touch()
+    }
+
+    /// Clears the default flag from this persona if it was the default.
+    /// - Parameter context: The SwiftData model context
+    func clearDefault(in context: ModelContext) {
+        if isDefault {
+            isDefault = false
+            touch()
         }
     }
 }

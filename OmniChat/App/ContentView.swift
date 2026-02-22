@@ -106,7 +106,7 @@ struct ContentView: View {
 
     /// Creates a new conversation and selects it.
     ///
-    /// The new conversation is configured with the default provider and model
+    /// The new conversation is configured with the default provider, model, and persona
     /// if available. This ensures users can immediately start sending messages
     /// without manually selecting a provider first.
     private func createNewConversation() {
@@ -114,9 +114,13 @@ struct ContentView: View {
             let providerManager = ProviderManager(modelContext: modelContext)
             let defaultProvider = providerManager.defaultProvider
 
+            // Get default persona
+            let defaultPersona = Persona.fetchDefault(from: modelContext)
+
             let conversation = Conversation()
             conversation.providerConfigID = defaultProvider?.id
             conversation.modelID = defaultProvider?.defaultModel?.id
+            conversation.personaID = defaultPersona?.id
 
             modelContext.insert(conversation)
             selectedConversation = conversation

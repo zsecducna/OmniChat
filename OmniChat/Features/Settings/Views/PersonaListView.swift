@@ -20,6 +20,7 @@ import SwiftData
 /// - Search bar for filtering personas
 /// - Tap to edit opens PersonaEditorView
 /// - Swipe actions: edit and delete (custom personas only)
+/// - Set default persona for new conversations
 ///
 /// ## Sections
 /// - **Built-in Personas**: Default system prompts shipped with the app
@@ -81,6 +82,11 @@ struct PersonaListView: View {
         }
     }
 
+    /// The current default persona.
+    private var defaultPersona: Persona? {
+        allPersonas.first { $0.isDefault }
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -89,17 +95,24 @@ struct PersonaListView: View {
             if !filteredBuiltInPersonas.isEmpty {
                 Section {
                     ForEach(filteredBuiltInPersonas) { persona in
-                        PersonaRow(persona: persona, colorScheme: colorScheme)
+                        PersonaRow(
+                            persona: persona,
+                            colorScheme: colorScheme,
+                            isDefault: persona.isDefault
+                        )
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 // Built-in personas can be viewed but not edited
                                 personaToEdit = persona
                             }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                setDefaultButton(for: persona)
+                            }
                     }
                 } header: {
                     sectionHeader(title: "Built-in", count: builtInPersonas.count)
                 } footer: {
-                    Text("Default personas shipped with OmniChat. Tap to view details.")
+                    Text("Default personas shipped with OmniChat. Tap to view details. Swipe to set as default.")
                         .font(Theme.Typography.caption)
                 }
             }
@@ -110,13 +123,19 @@ struct PersonaListView: View {
                     emptyCustomPersonasView
                 } else {
                     ForEach(filteredCustomPersonas) { persona in
-                        PersonaRow(persona: persona, colorScheme: colorScheme, showEditBadge: true)
+                        PersonaRow(
+                            persona: persona,
+                            colorScheme: colorScheme,
+                            showEditBadge: true,
+                            isDefault: persona.isDefault
+                        )
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 personaToEdit = persona
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 deleteButton(for: persona)
+                                setDefaultButton(for: persona)
                             }
                             .swipeActions(edge: .leading) {
                                 editButton(for: persona)
@@ -127,7 +146,7 @@ struct PersonaListView: View {
                 sectionHeader(title: "Custom", count: customPersonas.count)
             } footer: {
                 if !customPersonas.isEmpty {
-                    Text("Your custom personas. Swipe to edit or delete.")
+                    Text("Your custom personas. Swipe to edit, delete, or set as default.")
                         .font(Theme.Typography.caption)
                 }
             }
@@ -252,11 +271,30 @@ struct PersonaListView: View {
         .tint(.blue)
     }
 
+    /// Set as default swipe action button.
+    private func setDefaultButton(for persona: Persona) -> some View {
+        Button {
+            setAsDefault(persona)
+        } label: {
+            Label(
+                persona.isDefault ? "Default" : "Set as Default",
+                systemImage: persona.isDefault ? "star.fill" : "star"
+            )
+        }
+        .tint(.orange)
+        .disabled(persona.isDefault)
+    }
+
     // MARK: - Actions
 
     /// Deletes a custom persona from SwiftData.
     private func deletePersona(_ persona: Persona) {
         modelContext.delete(persona)
+    }
+
+    /// Sets a persona as the default for new conversations.
+    private func setAsDefault(_ persona: Persona) {
+        persona.setAsDefault(in: modelContext)
     }
 }
 
@@ -267,6 +305,7 @@ private struct PersonaRow: View {
     let persona: Persona
     let colorScheme: ColorScheme
     var showEditBadge: Bool = false
+    var isDefault: Bool = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.medium.rawValue) {
@@ -282,6 +321,10 @@ private struct PersonaRow: View {
 
                     if persona.isBuiltIn {
                         builtInBadge
+                    }
+
+                    if isDefault {
+                        defaultBadge
                     }
                 }
 
@@ -341,6 +384,18 @@ private struct PersonaRow: View {
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .background(Theme.Colors.success)
+            .clipShape(Capsule())
+    }
+
+    /// "Default" badge indicator.
+    private var defaultBadge: some View {
+        Text("Default")
+            .font(.system(size: 9, weight: .medium))
+            .textCase(.uppercase)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(Theme.Colors.warning)
             .clipShape(Capsule())
     }
 }

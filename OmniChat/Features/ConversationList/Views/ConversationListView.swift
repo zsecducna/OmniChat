@@ -18,6 +18,7 @@ import SwiftData
 /// - Empty state for new users
 /// - Search filtering by title and message content
 /// - Swipe actions for quick operations
+/// - Context menu for rename and delete
 struct ConversationListView: View {
     /// The currently selected conversation.
     @Binding var selectedConversation: Conversation?
@@ -34,6 +35,15 @@ struct ConversationListView: View {
     /// Whether the view is loading (for skeleton display).
     @State private var isLoading = true
 
+    /// Conversation being edited (for rename).
+    @State private var conversationToRename: Conversation?
+
+    /// New title for rename.
+    @State private var newTitle = ""
+
+    /// Conversation to delete with confirmation.
+    @State private var conversationToDelete: Conversation?
+
     /// Filtered conversations based on search text.
     private var filteredConversations: [Conversation] {
         if searchText.isEmpty {
@@ -41,9 +51,9 @@ struct ConversationListView: View {
         }
         return conversations.filter { conversation in
             conversation.title.localizedCaseInsensitiveContains(searchText) ||
-            conversation.messages.contains { message in
+            (conversation.messages?.contains { message in
                 message.content.localizedCaseInsensitiveContains(searchText)
-            }
+            } ?? false)
         }
     }
 
@@ -78,6 +88,39 @@ struct ConversationListView: View {
             try? await Task.sleep(for: .milliseconds(300))
             isLoading = false
         }
+        .alert("Rename Conversation", isPresented: .init(
+            get: { conversationToRename != nil },
+            set: { if !$0 { conversationToRename = nil } }
+        )) {
+            TextField("Title", text: $newTitle)
+            Button("Cancel", role: .cancel) {
+                conversationToRename = nil
+            }
+            Button("Rename") {
+                if let conversation = conversationToRename, !newTitle.trimmingCharacters(in: .whitespaces).isEmpty {
+                    conversation.title = newTitle.trimmingCharacters(in: .whitespaces)
+                    conversation.touch()
+                }
+                conversationToRename = nil
+            }
+        } message: {
+            Text("Enter a new name for this conversation")
+        }
+        .confirmationDialog(
+            "Delete Conversation?",
+            isPresented: .init(
+                get: { conversationToDelete != nil },
+                set: { if !$0 { conversationToDelete = nil } }
+            ),
+            presenting: conversationToDelete
+        ) { conversation in
+            Button("Delete", role: .destructive) {
+                deleteConversation(conversation)
+                conversationToDelete = nil
+            }
+        } message: { conversation in
+            Text("Are you sure you want to delete '\(conversation.title)'? This action cannot be undone.")
+        }
     }
 
     // MARK: - Content View
@@ -87,6 +130,44 @@ struct ConversationListView: View {
             ForEach(sortedConversations) { conversation in
                 ConversationRow(conversation: conversation)
                     .tag(conversation)
+                    .contextMenu {
+                        // Rename option
+                        Button {
+                            conversationToRename = conversation
+                            newTitle = conversation.title
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+
+                        // Pin/Unpin
+                        Button {
+                            togglePin(conversation)
+                        } label: {
+                            Label(
+                                conversation.isPinned ? "Unpin" : "Pin",
+                                systemImage: conversation.isPinned ? "pin.slash" : "pin"
+                            )
+                        }
+
+                        // Archive/Unarchive
+                        Button {
+                            toggleArchive(conversation)
+                        } label: {
+                            Label(
+                                conversation.isArchived ? "Unarchive" : "Archive",
+                                systemImage: conversation.isArchived ? "tray.and.arrow.up" : "archivebox"
+                            )
+                        }
+
+                        Divider()
+
+                        // Delete
+                        Button(role: .destructive) {
+                            conversationToDelete = conversation
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         deleteButton(for: conversation)
                     }
@@ -152,7 +233,7 @@ struct ConversationListView: View {
     @ViewBuilder
     private func deleteButton(for conversation: Conversation) -> some View {
         Button(role: .destructive) {
-            deleteConversation(conversation)
+            conversationToDelete = conversation
         } label: {
             Label("Delete", systemImage: "trash")
         }
@@ -202,12 +283,12 @@ struct ConversationListView: View {
 
     private func togglePin(_ conversation: Conversation) {
         conversation.isPinned.toggle()
-        conversation.updatedAt = Date()
+        conversation.touch()
     }
 
     private func toggleArchive(_ conversation: Conversation) {
         conversation.isArchived.toggle()
-        conversation.updatedAt = Date()
+        conversation.touch()
     }
 }
 
@@ -276,11 +357,13 @@ private func createPreviewContainerWithConversations() -> ModelContainer {
     // Add some messages
     let msg1 = Message(role: .assistant, content: "Here's how you can implement the feature...")
     msg1.conversation = conv1
-    conv1.messages.append(msg1)
+    if conv1.messages == nil { conv1.messages = [] }
+    conv1.messages?.append(msg1)
 
     let msg2 = Message(role: .assistant, content: "The API endpoint is documented at...")
     msg2.conversation = conv2
-    conv2.messages.append(msg2)
+    if conv2.messages == nil { conv2.messages = [] }
+    conv2.messages?.append(msg2)
 
     context.insert(conv1)
     context.insert(conv2)
