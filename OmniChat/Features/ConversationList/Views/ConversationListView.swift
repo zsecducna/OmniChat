@@ -23,6 +23,9 @@ struct ConversationListView: View {
     /// The currently selected conversation.
     @Binding var selectedConversation: Conversation?
 
+    /// Callback to create a new conversation. Called from empty state button.
+    var onCreateNewConversation: (() -> Void)?
+
     /// The SwiftData model context for CRUD operations.
     @Environment(\.modelContext) private var modelContext
 
@@ -219,7 +222,7 @@ struct ConversationListView: View {
         } actions: {
             if searchText.isEmpty {
                 Button("New Conversation") {
-                    // This will be handled by the parent view's Cmd+N shortcut
+                    onCreateNewConversation?()
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -339,7 +342,12 @@ private struct ConversationSkeletonRow: View {
 
 #Preview("ConversationListView - Empty") {
     NavigationStack {
-        ConversationListView(selectedConversation: .constant(nil))
+        ConversationListView(
+            selectedConversation: .constant(nil),
+            onCreateNewConversation: {
+                print("Create new conversation")
+            }
+        )
     }
     .modelContainer(DataManager.createPreviewContainer())
 }
@@ -374,7 +382,12 @@ private func createPreviewContainerWithConversations() -> ModelContainer {
 
 #Preview("ConversationListView - With Conversations") {
     NavigationStack {
-        ConversationListView(selectedConversation: .constant(nil))
+        ConversationListView(
+            selectedConversation: .constant(nil),
+            onCreateNewConversation: {
+                print("Create new conversation")
+            }
+        )
     }
     .modelContainer(createPreviewContainerWithConversations())
 }

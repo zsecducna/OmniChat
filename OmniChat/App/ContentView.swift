@@ -34,6 +34,12 @@ struct ContentView: View {
     /// Controls presentation of the settings sheet.
     @State private var showSettings = false
 
+    /// Controls presentation of the new conversation title input alert.
+    @State private var showNewConversationAlert = false
+
+    /// Title for the new conversation.
+    @State private var newConversationTitle = ""
+
     /// Navigation path for iPhone push navigation.
     @State private var navigationPath = NavigationPath()
 
@@ -56,13 +62,31 @@ struct ContentView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        ConversationListView(selectedConversation: $selectedConversation)
+        ConversationListView(
+            selectedConversation: $selectedConversation,
+            onCreateNewConversation: { showNewConversationAlert = true }
+        )
             .navigationTitle("Conversations")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 toolbarContent
+            }
+            .alert("New Conversation", isPresented: $showNewConversationAlert) {
+                TextField("Title (optional)", text: $newConversationTitle)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.sentences)
+                    #endif
+                Button("Cancel", role: .cancel) {
+                    newConversationTitle = ""
+                }
+                Button("Create") {
+                    createNewConversation()
+                    newConversationTitle = ""
+                }
+            } message: {
+                Text("Enter a title for your new conversation")
             }
     }
 
@@ -82,8 +106,8 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Button(action: createNewConversation) {
-                Label("New Chat", systemImage: "square.and.pencil")
+            Button(action: { showNewConversationAlert = true }) {
+                Label("New Chat", systemImage: "plus")
             }
             .keyboardShortcut("n", modifiers: .command)
             .help("Create a new conversation (⌘N)")
@@ -109,6 +133,9 @@ struct ContentView: View {
     /// The new conversation is configured with the default provider, model, and persona
     /// if available. This ensures users can immediately start sending messages
     /// without manually selecting a provider first.
+    ///
+    /// If `newConversationTitle` is non-empty, it's used as the title.
+    /// Otherwise, a default title is generated.
     private func createNewConversation() {
         withAnimation(.easeInOut(duration: Theme.Animation.default)) {
             let providerManager = ProviderManager(modelContext: modelContext)
@@ -117,7 +144,12 @@ struct ContentView: View {
             // Get default persona
             let defaultPersona = Persona.fetchDefault(from: modelContext)
 
-            let conversation = Conversation()
+            // Use provided title or generate default
+            let title = newConversationTitle.trimmingCharacters(in: .whitespaces).isEmpty
+                ? "New Conversation"
+                : newConversationTitle.trimmingCharacters(in: .whitespaces)
+
+            let conversation = Conversation(title: title)
             conversation.providerConfigID = defaultProvider?.id
             conversation.modelID = defaultProvider?.defaultModel?.id
             conversation.personaID = defaultPersona?.id
