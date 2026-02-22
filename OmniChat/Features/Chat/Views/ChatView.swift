@@ -594,83 +594,21 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        // Model switcher pill in toolbar
+        // Persona display in toolbar (replacing model switcher)
         ToolbarItem(placement: .primaryAction) {
-            if let manager = providerManager {
-                ModelSwitcher(
-                    selectedProviderID: $conversation.providerConfigID,
-                    selectedModelID: $conversation.modelID,
-                    providerManager: manager
-                )
-            } else {
-                // Fallback placeholder while loading
-                Button {} label: {
-                    HStack(spacing: Theme.Spacing.tight.rawValue) {
-                        Circle()
-                            .fill(Theme.Colors.customAccent)
-                            .frame(width: 8, height: 8)
-                        Text("Loading...")
-                            .font(Theme.Typography.caption)
-                    }
-                    .padding(.horizontal, Theme.Spacing.small.rawValue)
-                    .padding(.vertical, Theme.Spacing.tight.rawValue)
-                    .background(
-                        Capsule()
-                            .fill(Theme.Colors.secondaryBackground)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(true)
-            }
-        }
-
-        // Persona picker (only for new conversations)
-        if isNewConversation {
-            ToolbarItem(placement: .automatic) {
-                PersonaPicker(
-                    selectedPersonaID: $conversation.personaID,
-                    personas: personas,
-                    showNoneOption: true,
-                    isCompact: true
-                )
-                .help("Select persona for this conversation")
-            }
+            PersonaPicker(
+                selectedPersonaID: $conversation.personaID,
+                personas: personas,
+                showNoneOption: true,
+                isCompact: true
+            )
+            .help("Select persona for this conversation")
         }
 
         #if os(macOS)
         // Mac-specific toolbar items
         ToolbarItem(placement: .automatic) {
             Menu {
-                // Show persona picker in menu (for all conversations, but only effective for new)
-                if isNewConversation {
-                    Section("Persona") {
-                        Button {
-                            conversation.personaID = nil
-                        } label: {
-                            HStack {
-                                Text("None")
-                                if conversation.personaID == nil {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                        ForEach(personas) { persona in
-                            Button {
-                                conversation.personaID = persona.id
-                            } label: {
-                                HStack {
-                                    Image(systemName: persona.icon)
-                                    Text(persona.name)
-                                    if conversation.personaID == persona.id {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Divider()
-                }
-
                 // Delete option
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
