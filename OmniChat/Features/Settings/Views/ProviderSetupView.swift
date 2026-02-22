@@ -48,7 +48,14 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         case .ollama:
             // Ollama doesn't need the advanced step (base URL is in auth)
             return [.type, .auth, .model]
-        default:
+        case .anthropic, .openai, .zhipu:
+            // Built-in providers don't need advanced step
+            return [.type, .auth, .model]
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            // OpenAI-compatible providers: include advanced for optional base URL override
+            return [.type, .auth, .model, .advanced]
+        case .custom:
             return SetupStep.allCases
         }
     }
@@ -955,20 +962,6 @@ struct ProviderSetupView: View {
     @ViewBuilder
     private var openAICompatibleAuthSection: some View {
         Section {
-            TextField("Base URL", text: $baseURL)
-                .textContentType(.URL)
-                #if os(iOS)
-                .keyboardType(.URL)
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-                #endif
-        } header: {
-            Text("API Endpoint")
-        } footer: {
-            Text("Default: \(providerType.defaultBaseURL ?? "Custom URL")")
-        }
-
-        Section {
             SecureField("API Key", text: $apiKey)
                 .textContentType(.password)
                 #if os(iOS)
@@ -978,7 +971,7 @@ struct ProviderSetupView: View {
         } header: {
             Text("API Key")
         } footer: {
-            Text("Your API key is stored securely in Keychain")
+            Text("Your API key is stored securely in Keychain. Using \(providerType.defaultBaseURL ?? "default endpoint").")
         }
 
         Section {
