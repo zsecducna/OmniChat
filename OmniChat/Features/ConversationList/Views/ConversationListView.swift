@@ -139,14 +139,7 @@ struct ConversationListView: View {
     // MARK: - Content View
 
     private var contentView: some View {
-        List(selection: isEditMode ? $selectedConversations : Binding(
-            get: { selectedConversation.map { [$0.id] } ?? [] },
-            set: { newValue in
-                if let firstId = newValue.first {
-                    selectedConversation = sortedConversations.first { $0.id == firstId }
-                }
-            }
-        )) {
+        List(selection: $selectedConversations) {
             ForEach(sortedConversations) { conversation in
                 ConversationRow(conversation: conversation)
                     .tag(conversation.id)
@@ -202,6 +195,7 @@ struct ConversationListView: View {
         .navigationTitle(isEditMode ? "Select Conversations" : "Conversations")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .environment(\.editMode, .constant(isEditMode ? .active : .inactive))
         #endif
         .toolbar {
             #if os(iOS)
@@ -210,25 +204,18 @@ struct ConversationListView: View {
                     Button("Cancel") {
                         exitEditMode()
                     }
-                } else {
-                    EditButton()
                 }
             }
 
             ToolbarItem(placement: .primaryAction) {
                 if isEditMode {
-                    Menu {
-                        Button(role: .destructive) {
-                            showBulkDeleteConfirmation = true
-                        } label: {
-                            Label("Delete Selected (\(selectedConversations.count))", systemImage: "trash")
-                        }
+                    Button(role: .destructive) {
+                        showBulkDeleteConfirmation = true
                     } label: {
-                        Text("\(selectedConversations.count)")
-                            .font(.caption)
-                            .padding(6)
-                            .background(Circle().fill(Theme.Colors.accent))
-                            .foregroundStyle(.white)
+                        HStack(spacing: 4) {
+                            Image(systemName: "trash")
+                            Text("(\(selectedConversations.count))")
+                        }
                     }
                     .disabled(selectedConversations.isEmpty)
                 } else {
@@ -272,6 +259,26 @@ struct ConversationListView: View {
             }
         } message: {
             Text("This action cannot be undone.")
+        }
+        .onChange(of: selectedConversations) { _, newValue in
+            // Sync single selection when not in edit mode
+            if !isEditMode {
+                if let firstId = newValue.first {
+                    selectedConversation = sortedConversations.first { $0.id == firstId }
+                } else {
+                    selectedConversation = nil
+                }
+            }
+        }
+        .onChange(of: selectedConversation) { _, newValue in
+            // Sync multi-selection when not in edit mode
+            if !isEditMode {
+                if let conversation = newValue {
+                    selectedConversations = [conversation.id]
+                } else {
+                    selectedConversations.removeAll()
+                }
+            }
         }
         .overlay {
             if sortedConversations.isEmpty {
