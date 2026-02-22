@@ -180,7 +180,7 @@ struct SettingsView: View {
                     .foregroundStyle(Theme.Colors.secondaryText.resolve(in: colorScheme))
             }
 
-            Link(destination: URL(string: "https://github.com/zsec/omnichat")!) {
+            Link(destination: URL(string: "https://github.com/zsecducna/omnichat")!) {
                 HStack {
                     Label("GitHub", systemImage: "link")
                         .foregroundStyle(Theme.Colors.text.resolve(in: colorScheme))
@@ -190,7 +190,7 @@ struct SettingsView: View {
                 }
             }
 
-            Link(destination: URL(string: "https://github.com/zsec/omnichat/issues")!) {
+            Link(destination: URL(string: "https://github.com/zsecducna/omnichat/issues")!) {
                 HStack {
                     Label("Report an Issue", systemImage: "ladybug")
                         .foregroundStyle(Theme.Colors.text.resolve(in: colorScheme))
