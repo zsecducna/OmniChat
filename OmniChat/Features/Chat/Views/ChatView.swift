@@ -50,6 +50,9 @@ struct ChatView: View {
     /// Controls confirmation dialog for delete.
     @State private var showDeleteConfirmation = false
 
+    /// Controls presentation of the settings sheet.
+    @State private var showSettings = false
+
     /// All personas for the persona picker.
     @Query(sort: \Persona.sortOrder) private var personas: [Persona]
 
@@ -184,6 +187,12 @@ struct ChatView: View {
             ProviderSetupView(provider: nil)
                 #if os(macOS)
                 .frame(minWidth: 500, minHeight: 500)
+                #endif
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                #if os(macOS)
+                .frame(minWidth: 500, minHeight: 400)
                 #endif
         }
         .confirmationDialog(
@@ -608,26 +617,20 @@ struct ChatView: View {
         #if os(macOS)
         // Mac-specific toolbar items
         ToolbarItem(placement: .automatic) {
-            Menu {
-                // Delete option
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Delete Conversation", systemImage: "trash")
-                }
+            Button {
+                showSettings = true
             } label: {
-                Image(systemName: viewModel?.isStreaming == true ? "stop.circle" : "ellipsis.circle")
+                Image(systemName: "gearshape")
             }
-            .menuIndicator(.hidden)
-            .help(viewModel?.isStreaming == true ? "Stop generating" : "More options")
+            .help("Settings")
         }
         #else
-        // iOS: Delete button in toolbar
+        // iOS: Settings button in toolbar
         ToolbarItem(placement: .secondaryAction) {
-            Button(role: .destructive) {
-                showDeleteConfirmation = true
+            Button {
+                showSettings = true
             } label: {
-                Image(systemName: "trash")
+                Image(systemName: "gearshape")
             }
         }
         #endif
