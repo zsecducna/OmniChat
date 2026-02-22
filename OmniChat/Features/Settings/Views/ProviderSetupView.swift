@@ -4,10 +4,14 @@
 //
 //  Multi-step form for adding or editing a provider configuration.
 //  Implements TASK-3.3: Provider configuration UI with validation.
+//  Updated for TASK-7.3: Ollama and Custom provider support.
 //
 //  Steps:
 //  1. Select provider type (Anthropic / OpenAI / Ollama / Custom)
-//  2. Configure authentication (API Key or OAuth)
+//  2. Configure authentication (varies by provider type)
+//     - Anthropic/OpenAI: API Key
+//     - Ollama: Base URL only (no auth)
+//     - Custom: Base URL, API path, headers, format options
 //  3. Model selection (auto-fetched or manual)
 //  4. Advanced settings (base URL override, headers, etc.)
 //
@@ -34,6 +38,17 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         case .auth: return "Auth"
         case .model: return "Model"
         case .advanced: return "Advanced"
+        }
+    }
+
+    /// Returns the steps applicable for a given provider type.
+    static func steps(for providerType: ProviderType) -> [SetupStep] {
+        switch providerType {
+        case .ollama:
+            // Ollama doesn't need the advanced step (base URL is in auth)
+            return [.type, .auth, .model]
+        default:
+            return SetupStep.allCases
         }
     }
 }
@@ -82,12 +97,39 @@ struct ProviderSetupView: View {
     @State private var availableModels: [ModelInfo] = []
     @State private var currentStep: SetupStep = .type
 
+    // MARK: - Custom Provider State
+
+    @State private var apiPath = "/v1/chat/completions"
+    @State private var apiFormat: APIFormat = .openAI
+    @State private var streamingFormat: StreamingFormat = .sse
+    @State private var customHeaders: [(key: String, value: String)] = []
+
     // MARK: - Validation State
 
     @State private var isValidating = false
     @State private var validationError: String?
     @State private var isValidated = false
     @State private var isFetchingModels = false
+    @State private var isTestingConnection = false
+    @State private var connectionTestResult: ConnectionTestResult?
+
+    // MARK: - Connection Test Result
+
+    enum ConnectionTestResult: Equatable {
+        case success
+        case failure(String)
+
+        static func == (lhs: ConnectionTestResult, rhs: ConnectionTestResult) -> Bool {
+            switch (lhs, rhs) {
+            case (.success, .success):
+                return true
+            case (.failure(let lhsMessage), .failure(let rhsMessage)):
+                return lhsMessage == rhsMessage
+            default:
+                return false
+            }
+        }
+    }
 
     // MARK: - Computed Properties
 
@@ -142,7 +184,7 @@ struct ProviderSetupView: View {
 
     private var stepIndicator: some View {
         HStack(spacing: Theme.Spacing.small.rawValue) {
-            ForEach(SetupStep.allCases) { step in
+            ForEach(SetupStep.steps(for: providerType)) { step in
                 stepIndicatorItem(for: step)
             }
         }
@@ -150,30 +192,35 @@ struct ProviderSetupView: View {
     }
 
     private func stepIndicatorItem(for step: SetupStep) -> some View {
-        HStack(spacing: Theme.Spacing.tight.rawValue) {
+        let steps = applicableSteps
+        let isLast = step == steps.last
+        let stepIdx = steps.firstIndex(of: step) ?? 0
+        let currentIdx = steps.firstIndex(of: currentStep) ?? 0
+
+        return HStack(spacing: Theme.Spacing.tight.rawValue) {
             ZStack {
                 Circle()
-                    .fill(stepIndex(for: step) <= stepIndex(for: currentStep)
+                    .fill(stepIdx <= currentIdx
                           ? AnyShapeStyle(Theme.Colors.accent)
                           : AnyShapeStyle(Theme.Colors.tertiaryBackground))
                     .frame(width: 24, height: 24)
 
-                if stepIndex(for: step) < stepIndex(for: currentStep) {
+                if stepIdx < currentIdx {
                     Image(systemName: "checkmark")
                         .font(.caption2)
                         .foregroundColor(.white)
                 } else {
-                    Text("\(stepIndex(for: step) + 1)")
+                    Text("\(stepIdx + 1)")
                         .font(.caption2)
-                        .foregroundColor(stepIndex(for: step) == stepIndex(for: currentStep)
+                        .foregroundColor(stepIdx == currentIdx
                                          ? .white
                                          : Theme.Colors.tertiaryText.resolve(in: colorScheme))
                 }
             }
 
-            if step != .advanced {
+            if !isLast {
                 Rectangle()
-                    .fill(stepIndex(for: step) < stepIndex(for: currentStep)
+                    .fill(stepIdx < currentIdx
                           ? AnyShapeStyle(Theme.Colors.accent)
                           : AnyShapeStyle(Theme.Colors.border))
                     .frame(width: 20, height: 2)
@@ -182,7 +229,8 @@ struct ProviderSetupView: View {
     }
 
     private func stepIndex(for step: SetupStep) -> Int {
-        SetupStep.allCases.firstIndex(of: step) ?? 0
+        let steps = applicableSteps
+        return steps.firstIndex(of: step) ?? 0
     }
 
     // MARK: - Step Content
@@ -199,6 +247,11 @@ struct ProviderSetupView: View {
         case .advanced:
             advancedSettingsStep
         }
+    }
+
+    /// Returns the steps for the current provider type.
+    private var applicableSteps: [SetupStep] {
+        SetupStep.steps(for: providerType)
     }
 
     // MARK: - Step 1: Type Selection
@@ -252,73 +305,315 @@ struct ProviderSetupView: View {
 
     private var authConfigurationStep: some View {
         Form {
-            Section {
-                SecureField("API Key", text: $apiKey)
-                    .textContentType(.password)
-                    #if os(iOS)
-                    .autocapitalization(.none)
-                    .autocorrectionDisabled()
-                    #endif
-            } header: {
-                Text("API Key")
-            } footer: {
-                Text("Your API key is stored securely in Keychain and synced via iCloud")
-            }
+            switch providerType {
+            case .anthropic, .openai:
+                apiKeySection
+                validationSection
 
-            if providerType == .ollama {
-                Section {
-                    TextField("Base URL", text: $baseURL)
-                        .textContentType(.URL)
-                        #if os(iOS)
-                        .keyboardType(.URL)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-                        #endif
-                } header: {
-                    Text("Server URL")
-                } footer: {
-                    Text("Default: http://localhost:11434")
-                }
-            }
+            case .ollama:
+                ollamaConfigurationSection
 
-            Section {
-                Button {
-                    validateCredentials()
-                } label: {
-                    HStack {
-                        Text("Validate")
-                            .font(Theme.Typography.body)
-                        Spacer()
-                        if isValidating {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        }
-                    }
-                }
-                .disabled(apiKey.isEmpty || isValidating)
-
-                if let error = validationError {
-                    Label(error, systemImage: "xmark.circle")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.destructive)
-                }
-
-                if isValidated {
-                    Label("Validated successfully", systemImage: "checkmark.circle")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.success)
-                }
-            } header: {
-                Text("Validation")
-            } footer: {
-                if !isValidated {
-                    Text("Validate your credentials before proceeding")
-                }
+            case .custom:
+                customProviderConfigurationSection
             }
         }
         .formStyle(.grouped)
         .safeAreaInset(edge: .bottom) {
-            continueButton(canProceed: isValidated)
+            continueButton(canProceed: canProceedFromAuthStep)
+        }
+    }
+
+    // MARK: - API Key Section (Anthropic/OpenAI)
+
+    private var apiKeySection: some View {
+        Section {
+            SecureField("API Key", text: $apiKey)
+                .textContentType(.password)
+                #if os(iOS)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("API Key")
+        } footer: {
+            Text("Your API key is stored securely in Keychain and synced via iCloud")
+        }
+    }
+
+    // MARK: - Validation Section
+
+    private var validationSection: some View {
+        Section {
+            Button {
+                validateCredentials()
+            } label: {
+                HStack {
+                    Text("Validate")
+                        .font(Theme.Typography.body)
+                    Spacer()
+                    if isValidating {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            .disabled(apiKey.isEmpty || isValidating)
+
+            if let error = validationError {
+                Label(error, systemImage: "xmark.circle")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.destructive)
+            }
+
+            if isValidated {
+                Label("Validated successfully", systemImage: "checkmark.circle")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.success)
+            }
+        } header: {
+            Text("Validation")
+        } footer: {
+            if !isValidated {
+                Text("Validate your credentials before proceeding")
+            }
+        }
+    }
+
+    // MARK: - Ollama Configuration Section
+
+    @ViewBuilder
+    private var ollamaConfigurationSection: some View {
+        Section {
+            TextField("Base URL", text: $baseURL)
+                .textContentType(.URL)
+                #if os(iOS)
+                .keyboardType(.URL)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("Server URL")
+        } footer: {
+            Text("Default: http://localhost:11434 - Ollama runs locally without authentication")
+        }
+
+        Section {
+            Button {
+                testOllamaConnection()
+            } label: {
+                HStack {
+                    Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
+                        .font(Theme.Typography.body)
+                    Spacer()
+                    if isTestingConnection {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            .disabled(isTestingConnection)
+
+            if let result = connectionTestResult {
+                switch result {
+                case .success:
+                    Label("Connected successfully", systemImage: "checkmark.circle")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.success)
+                case .failure(let message):
+                    Label(message, systemImage: "xmark.circle")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.destructive)
+                }
+            }
+        } header: {
+            Text("Connection")
+        } footer: {
+            Text("Make sure Ollama is running on your machine before testing")
+        }
+
+        Section {
+            Text("Ollama is a local LLM server that runs entirely on your machine. No API key or authentication is required.")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Colors.secondaryText)
+        } header: {
+            Text("About Ollama")
+        }
+    }
+
+    // MARK: - Custom Provider Configuration Section
+
+    @ViewBuilder
+    private var customProviderConfigurationSection: some View {
+        // Base URL
+        Section {
+            TextField("Base URL", text: $baseURL)
+                .textContentType(.URL)
+                #if os(iOS)
+                .keyboardType(.URL)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("Base URL")
+        } footer: {
+            Text("The base URL for the API (e.g., https://api.example.com)")
+        }
+
+        // API Path
+        Section {
+            TextField("API Path", text: $apiPath)
+                .textContentType(.URL)
+                #if os(iOS)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("API Path")
+        } footer: {
+            Text("The path appended to the base URL (default: /v1/chat/completions)")
+        }
+
+        // API Format
+        Section {
+            Picker("Format", selection: $apiFormat) {
+                ForEach(APIFormat.allCases, id: \.self) { format in
+                    Text(format.displayName).tag(format)
+                }
+            }
+            #if os(iOS)
+            .pickerStyle(.navigationLink)
+            #else
+            .pickerStyle(.menu)
+            #endif
+        } header: {
+            Text("API Format")
+        } footer: {
+            Text(apiFormat.description)
+        }
+
+        // Streaming Format
+        Section {
+            Picker("Streaming", selection: $streamingFormat) {
+                ForEach(StreamingFormat.allCases, id: \.self) { format in
+                    Text(format.displayName).tag(format)
+                }
+            }
+            #if os(iOS)
+            .pickerStyle(.navigationLink)
+            #else
+            .pickerStyle(.menu)
+            #endif
+        } header: {
+            Text("Streaming Format")
+        } footer: {
+            Text(streamingFormat.supportsStreaming ? "Responses will be streamed in real-time" : "Responses will be returned in full")
+        }
+
+        // Authentication
+        Section {
+            SecureField("API Key (optional)", text: $apiKey)
+                .textContentType(.password)
+                #if os(iOS)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("Authentication")
+        } footer: {
+            Text("Leave empty if the provider doesn't require authentication")
+        }
+
+        // Custom Headers
+        customHeadersSection
+
+        // Test Connection
+        Section {
+            Button {
+                testCustomProviderConnection()
+            } label: {
+                HStack {
+                    Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
+                        .font(Theme.Typography.body)
+                    Spacer()
+                    if isTestingConnection {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            .disabled(baseURL.isEmpty || isTestingConnection)
+
+            if let result = connectionTestResult {
+                switch result {
+                case .success:
+                    Label("Connected successfully", systemImage: "checkmark.circle")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.success)
+                case .failure(let message):
+                    Label(message, systemImage: "xmark.circle")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.destructive)
+                }
+            }
+        } header: {
+            Text("Connection")
+        } footer: {
+            Text("Test your configuration before saving")
+        }
+    }
+
+    // MARK: - Custom Headers Section
+
+    private var customHeadersSection: some View {
+        Section {
+            ForEach(customHeaders.indices, id: \.self) { index in
+                HStack(spacing: Theme.Spacing.small.rawValue) {
+                    TextField("Header", text: $customHeaders[index].key)
+                        .font(Theme.Typography.code)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        #endif
+
+                    TextField("Value", text: $customHeaders[index].value)
+                        .font(Theme.Typography.code)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        #endif
+                }
+            }
+            .onDelete(perform: deleteCustomHeader)
+
+            Button {
+                customHeaders.append((key: "", value: ""))
+            } label: {
+                Label("Add Header", systemImage: "plus")
+                    .font(Theme.Typography.body)
+            }
+        } header: {
+            Text("Custom Headers")
+        } footer: {
+            Text("Additional headers to include in requests (e.g., X-Custom-Header: value)")
+        }
+    }
+
+    private func deleteCustomHeader(at offsets: IndexSet) {
+        customHeaders.remove(atOffsets: offsets)
+    }
+
+    // MARK: - Can Proceed from Auth Step
+
+    private var canProceedFromAuthStep: Bool {
+        switch providerType {
+        case .anthropic, .openai:
+            return isValidated
+        case .ollama:
+            // For Ollama, we just need a non-empty base URL or accept the default
+            return true
+        case .custom:
+            // For custom, we need a base URL
+            return !baseURL.trimmingCharacters(in: .whitespaces).isEmpty
         }
     }
 
@@ -469,7 +764,8 @@ struct ProviderSetupView: View {
     // MARK: - Computed Properties
 
     private var actionButtonTitle: String {
-        if currentStep == .advanced {
+        let steps = applicableSteps
+        if currentStep == steps.last {
             return "Save"
         }
         return "Next"
@@ -480,7 +776,7 @@ struct ProviderSetupView: View {
         case .type:
             return !name.trimmingCharacters(in: .whitespaces).isEmpty
         case .auth:
-            return isValidated
+            return canProceedFromAuthStep
         case .model:
             return selectedModelID != nil
         case .advanced:
@@ -491,7 +787,8 @@ struct ProviderSetupView: View {
     // MARK: - Actions
 
     private func handleActionButton() {
-        if currentStep == .advanced {
+        let steps = applicableSteps
+        if currentStep == steps.last {
             saveProvider()
         } else {
             advanceToNextStep()
@@ -499,15 +796,21 @@ struct ProviderSetupView: View {
     }
 
     private func advanceToNextStep() {
-        guard let currentIndex = SetupStep.allCases.firstIndex(of: currentStep),
-              currentIndex < SetupStep.allCases.count - 1 else { return }
+        let steps = applicableSteps
+        guard let currentIndex = steps.firstIndex(of: currentStep),
+              currentIndex < steps.count - 1 else { return }
 
         // Auto-fetch models when advancing to model step
         if currentStep == .auth && availableModels.isEmpty {
             fetchModels()
         }
 
-        currentStep = SetupStep.allCases[currentIndex + 1]
+        // Set default base URL for Ollama if empty
+        if providerType == .ollama && baseURL.trimmingCharacters(in: .whitespaces).isEmpty {
+            baseURL = ProviderType.ollama.defaultBaseURL ?? "http://localhost:11434"
+        }
+
+        currentStep = steps[currentIndex + 1]
     }
 
     private func loadProviderData(_ provider: ProviderConfig) {
@@ -517,10 +820,22 @@ struct ProviderSetupView: View {
         baseURL = provider.baseURL ?? ""
         availableModels = provider.availableModels
 
-        // Load API key from Keychain
-        if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
-            apiKey = key
+        // Load custom headers for custom providers
+        if providerType == .custom {
+            customHeaders = provider.customHeaders.map { (key: $0.key, value: $0.value) }
+        }
+
+        // Load API key from Keychain (only for providers that use it)
+        switch providerType {
+        case .anthropic, .openai, .custom:
+            if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
+                apiKey = key
+                isValidated = true
+            }
+        case .ollama:
+            // Ollama doesn't use API keys, mark as validated
             isValidated = true
+            connectionTestResult = nil
         }
     }
 
@@ -550,7 +865,12 @@ struct ProviderSetupView: View {
                     costPerInputToken: nil,
                     costPerOutputToken: nil,
                     effectiveBaseURL: baseURL.isEmpty ? providerType.defaultBaseURL : baseURL,
-                    defaultModel: nil
+                    effectiveAPIPath: apiPath,
+                    defaultModel: nil,
+                    apiFormat: apiFormat,
+                    streamingFormat: streamingFormat,
+                    apiKeyHeader: nil,
+                    apiKeyPrefix: nil
                 )
 
                 // Get appropriate adapter and validate
@@ -575,6 +895,138 @@ struct ProviderSetupView: View {
         }
     }
 
+    // MARK: - Ollama Connection Test
+
+    private func testOllamaConnection() {
+        isTestingConnection = true
+        connectionTestResult = nil
+
+        let effectiveURL = baseURL.trimmingCharacters(in: .whitespaces).isEmpty
+            ? ProviderType.ollama.defaultBaseURL ?? "http://localhost:11434"
+            : baseURL
+
+        Task {
+            do {
+                // Try to fetch models from Ollama
+                let url = URL(string: "\(effectiveURL)/api/tags")!
+                let (_, response) = try await URLSession.shared.data(from: url)
+
+                if let httpResponse = response as? HTTPURLResponse {
+                    await MainActor.run {
+                        isTestingConnection = false
+                        if httpResponse.statusCode == 200 {
+                            connectionTestResult = .success
+                            // Update base URL if we used default
+                            if baseURL.trimmingCharacters(in: .whitespaces).isEmpty {
+                                baseURL = effectiveURL
+                            }
+                        } else {
+                            connectionTestResult = .failure("Server returned status \(httpResponse.statusCode)")
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isTestingConnection = false
+                    if let urlError = error as? URLError {
+                        switch urlError.code {
+                        case .cannotConnectToHost:
+                            connectionTestResult = .failure("Cannot connect to Ollama. Make sure it's running.")
+                        case .timedOut:
+                            connectionTestResult = .failure("Connection timed out")
+                        default:
+                            connectionTestResult = .failure(urlError.localizedDescription)
+                        }
+                    } else {
+                        connectionTestResult = .failure(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Custom Provider Connection Test
+
+    private func testCustomProviderConnection() {
+        isTestingConnection = true
+        connectionTestResult = nil
+
+        Task {
+            do {
+                // Build URL
+                let effectiveBaseURL = baseURL.trimmingCharacters(in: .whitespaces)
+                guard !effectiveBaseURL.isEmpty else {
+                    await MainActor.run {
+                        isTestingConnection = false
+                        connectionTestResult = .failure("Base URL is required")
+                    }
+                    return
+                }
+
+                // Try a simple models list request
+                let urlString = "\(effectiveBaseURL)/v1/models"
+                guard let url = URL(string: urlString) else {
+                    await MainActor.run {
+                        isTestingConnection = false
+                        connectionTestResult = .failure("Invalid URL")
+                    }
+                    return
+                }
+
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                // Add API key if provided
+                if !apiKey.isEmpty {
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                }
+
+                // Add custom headers
+                for header in customHeaders where !header.key.isEmpty {
+                    request.setValue(header.value, forHTTPHeaderField: header.key)
+                }
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+
+                if let httpResponse = response as? HTTPURLResponse {
+                    await MainActor.run {
+                        isTestingConnection = false
+                        switch httpResponse.statusCode {
+                        case 200...299:
+                            connectionTestResult = .success
+                        case 401, 403:
+                            connectionTestResult = .failure("Authentication failed. Check your API key.")
+                        case 404:
+                            // Some providers don't have /v1/models endpoint, but the URL might still be valid
+                            connectionTestResult = .success
+                        default:
+                            connectionTestResult = .failure("Server returned status \(httpResponse.statusCode)")
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isTestingConnection = false
+                    if let urlError = error as? URLError {
+                        switch urlError.code {
+                        case .cannotConnectToHost:
+                            connectionTestResult = .failure("Cannot connect to server")
+                        case .timedOut:
+                            connectionTestResult = .failure("Connection timed out")
+                        case .serverCertificateUntrusted:
+                            connectionTestResult = .failure("SSL certificate error")
+                        default:
+                            connectionTestResult = .failure(urlError.localizedDescription)
+                        }
+                    } else {
+                        connectionTestResult = .failure(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
     private func fetchModels() {
         isFetchingModels = true
 
@@ -588,8 +1040,8 @@ struct ProviderSetupView: View {
                     isDefault: false,
                     sortOrder: 0,
                     baseURL: baseURL.isEmpty ? nil : baseURL,
-                    customHeaders: [:],
-                    authMethod: .apiKey,
+                    customHeaders: Dictionary(uniqueKeysWithValues: customHeaders.filter { !$0.key.isEmpty }.map { ($0.key, $0.value) }),
+                    authMethod: providerType == .ollama ? .none : .apiKey,
                     oauthClientID: nil,
                     oauthAuthURL: nil,
                     oauthTokenURL: nil,
@@ -599,17 +1051,52 @@ struct ProviderSetupView: View {
                     costPerInputToken: nil,
                     costPerOutputToken: nil,
                     effectiveBaseURL: baseURL.isEmpty ? providerType.defaultBaseURL : baseURL,
-                    defaultModel: nil
+                    effectiveAPIPath: apiPath,
+                    defaultModel: nil,
+                    apiFormat: apiFormat,
+                    streamingFormat: streamingFormat,
+                    apiKeyHeader: nil,
+                    apiKeyPrefix: nil
                 )
 
-                let adapter = try getAdapter(for: tempConfig, apiKey: apiKey)
-                let models = try await adapter.fetchModels()
+                switch providerType {
+                case .anthropic, .openai:
+                    let adapter = try getAdapter(for: tempConfig, apiKey: apiKey)
+                    let models = try await adapter.fetchModels()
+                    await MainActor.run {
+                        isFetchingModels = false
+                        availableModels = models.sorted { $0.displayName < $1.displayName }
+                        if selectedModelID == nil {
+                            selectedModelID = models.first?.id
+                        }
+                    }
 
-                await MainActor.run {
-                    isFetchingModels = false
-                    availableModels = models.sorted { $0.displayName < $1.displayName }
-                    if selectedModelID == nil {
-                        selectedModelID = models.first?.id
+                case .ollama:
+                    // Fetch from Ollama directly
+                    let models = try await fetchOllamaModels(baseURL: tempConfig.effectiveBaseURL ?? "http://localhost:11434")
+                    await MainActor.run {
+                        isFetchingModels = false
+                        availableModels = models
+                        if selectedModelID == nil {
+                            selectedModelID = models.first?.id
+                        }
+                    }
+
+                case .custom:
+                    // For custom providers, try to fetch from /v1/models or use defaults
+                    if let models = try? await fetchCustomProviderModels(config: tempConfig), !models.isEmpty {
+                        await MainActor.run {
+                            isFetchingModels = false
+                            availableModels = models
+                            if selectedModelID == nil {
+                                selectedModelID = models.first?.id
+                            }
+                        }
+                    } else {
+                        await MainActor.run {
+                            isFetchingModels = false
+                            loadDefaultModels()
+                        }
                     }
                 }
             } catch {
@@ -619,6 +1106,92 @@ struct ProviderSetupView: View {
                     loadDefaultModels()
                 }
             }
+        }
+    }
+
+    // MARK: - Fetch Ollama Models
+
+    private func fetchOllamaModels(baseURL: String) async throws -> [ModelInfo] {
+        let url = URL(string: "\(baseURL)/api/tags")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ProviderError.serverError(statusCode: statusCode, message: "Failed to fetch models from Ollama")
+        }
+
+        // Parse Ollama response: { "models": [{ "name": "llama3.2", ... }, ...] }
+        struct OllamaModel: Codable {
+            let name: String
+            let modified_at: String?
+            let size: Int?
+        }
+
+        struct OllamaModelsResponse: Codable {
+            let models: [OllamaModel]
+        }
+
+        let ollamaResponse = try JSONDecoder().decode(OllamaModelsResponse.self, from: data)
+
+        return ollamaResponse.models.map { model in
+            ModelInfo(
+                id: model.name,
+                displayName: model.name,
+                contextWindow: nil,
+                supportsVision: model.name.contains("vision") || model.name.contains("llava"),
+                supportsStreaming: true
+            )
+        }
+    }
+
+    // MARK: - Fetch Custom Provider Models
+
+    private func fetchCustomProviderModels(config: ProviderConfigSnapshot) async throws -> [ModelInfo] {
+        guard let baseURL = config.effectiveBaseURL else {
+            throw ProviderError.invalidResponse("Base URL is required")
+        }
+
+        let url = URL(string: "\(baseURL)/v1/models")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+
+        for header in customHeaders where !header.key.isEmpty {
+            request.setValue(header.value, forHTTPHeaderField: header.key)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ProviderError.serverError(statusCode: statusCode, message: "Failed to fetch models")
+        }
+
+        // Parse OpenAI-style response
+        struct OpenAIModel: Codable {
+            let id: String
+            let owned_by: String?
+        }
+
+        struct OpenAIModelsResponse: Codable {
+            let data: [OpenAIModel]
+        }
+
+        let modelsResponse = try JSONDecoder().decode(OpenAIModelsResponse.self, from: data)
+
+        return modelsResponse.data.map { model in
+            ModelInfo(
+                id: model.id,
+                displayName: model.id,
+                contextWindow: nil,
+                supportsVision: model.id.contains("vision") || model.id.contains("gpt-4"),
+                supportsStreaming: true
+            )
         }
     }
 
@@ -632,6 +1205,20 @@ struct ProviderSetupView: View {
     private func saveProvider() {
         let config: ProviderConfig
 
+        // Build custom headers dictionary
+        let headersDict = Dictionary(uniqueKeysWithValues: customHeaders.filter { !$0.key.isEmpty }.map { ($0.key, $0.value) })
+
+        // Determine auth method based on provider type
+        let authMethod: AuthMethod
+        switch providerType {
+        case .anthropic, .openai:
+            authMethod = .apiKey
+        case .ollama:
+            authMethod = .none
+        case .custom:
+            authMethod = apiKey.isEmpty ? .none : .apiKey
+        }
+
         if let existing = provider {
             config = existing
             config.name = name
@@ -639,25 +1226,31 @@ struct ProviderSetupView: View {
             config.baseURL = baseURL.isEmpty ? nil : baseURL
             config.defaultModelID = selectedModelID
             config.availableModels = availableModels
+            config.customHeaders = headersDict
+            config.authMethod = authMethod
             config.touch()
         } else {
             config = ProviderConfig(
                 name: name,
                 providerType: providerType,
                 baseURL: baseURL.isEmpty ? nil : baseURL,
+                customHeaders: headersDict,
+                authMethod: authMethod,
                 availableModels: availableModels,
                 defaultModelID: selectedModelID
             )
             modelContext.insert(config)
         }
 
-        // Save API key to Keychain
-        do {
-            try KeychainManager.shared.saveAPIKey(apiKey, providerID: config.id)
-        } catch {
-            // Log error but don't fail - the Keychain save might fail in simulator
-            os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
-                .error("Failed to save API key: \(error.localizedDescription)")
+        // Save API key to Keychain (only for providers that use it)
+        if !apiKey.isEmpty {
+            do {
+                try KeychainManager.shared.saveAPIKey(apiKey, providerID: config.id)
+            } catch {
+                // Log error but don't fail - the Keychain save might fail in simulator
+                os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
+                    .error("Failed to save API key: \(error.localizedDescription)")
+            }
         }
 
         dismiss()
@@ -694,14 +1287,21 @@ struct ProviderSetupView: View {
                 ModelInfo(id: "o1-mini", displayName: "o1 Mini", contextWindow: 128000, supportsVision: false, supportsStreaming: false)
             ]
         case .ollama:
+            // Default Ollama models - these should be replaced with actual fetched models
             return [
-                ModelInfo(id: "llama3.2", displayName: "Llama 3.2", supportsVision: false, supportsStreaming: true),
-                ModelInfo(id: "llama3.1", displayName: "Llama 3.1", supportsVision: false, supportsStreaming: true),
-                ModelInfo(id: "mistral", displayName: "Mistral", supportsVision: false, supportsStreaming: true),
-                ModelInfo(id: "codellama", displayName: "Code Llama", supportsVision: false, supportsStreaming: true)
+                ModelInfo(id: "llama3.2", displayName: "Llama 3.2", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llama3.2:1b", displayName: "Llama 3.2 1B", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llama3.1", displayName: "Llama 3.1", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llama3.1:8b", displayName: "Llama 3.1 8B", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "mistral", displayName: "Mistral", contextWindow: 32000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "codellama", displayName: "Code Llama", contextWindow: 16000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llava", displayName: "LLaVA (Vision)", contextWindow: 4000, supportsVision: true, supportsStreaming: true)
             ]
         case .custom:
-            return []
+            // For custom providers, user should enter models manually or fetch from API
+            return [
+                ModelInfo(id: "default", displayName: "Default Model", supportsVision: false, supportsStreaming: true)
+            ]
         }
     }
 
@@ -709,8 +1309,8 @@ struct ProviderSetupView: View {
         switch type {
         case .anthropic: return "brain"
         case .openai: return "cpu"
-        case .ollama: return "desktopcomputer"
-        case .custom: return "ellipsis.circle"
+        case .ollama: return "terminal"
+        case .custom: return "gearshape.2"
         }
     }
 
@@ -754,6 +1354,52 @@ private extension KeychainManager {
             ModelInfo(id: "claude-opus-4-20250514", displayName: "Claude Opus 4", contextWindow: 200000, supportsVision: true)
         ],
         defaultModelID: "claude-sonnet-4-5-20250929"
+    )
+    context.insert(provider)
+
+    return ProviderSetupView(provider: provider)
+        .modelContainer(container)
+}
+
+#Preview("Edit Ollama Provider") {
+    let container = DataManager.previewContainer
+    let context = container.mainContext
+
+    let provider = ProviderConfig(
+        name: "Local Ollama",
+        providerType: .ollama,
+        isEnabled: true,
+        isDefault: false,
+        baseURL: "http://localhost:11434",
+        authMethod: .none,
+        availableModels: [
+            ModelInfo(id: "llama3.2", displayName: "Llama 3.2", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+            ModelInfo(id: "mistral", displayName: "Mistral", contextWindow: 32000, supportsVision: false, supportsStreaming: true)
+        ],
+        defaultModelID: "llama3.2"
+    )
+    context.insert(provider)
+
+    return ProviderSetupView(provider: provider)
+        .modelContainer(container)
+}
+
+#Preview("Edit Custom Provider") {
+    let container = DataManager.previewContainer
+    let context = container.mainContext
+
+    let provider = ProviderConfig(
+        name: "My Custom API",
+        providerType: .custom,
+        isEnabled: true,
+        isDefault: false,
+        baseURL: "https://api.custom-llm.com",
+        customHeaders: ["X-Custom-Header": "custom-value"],
+        authMethod: .apiKey,
+        availableModels: [
+            ModelInfo(id: "custom-model-v1", displayName: "Custom Model v1", contextWindow: 32000, supportsVision: false, supportsStreaming: true)
+        ],
+        defaultModelID: "custom-model-v1"
     )
     context.insert(provider)
 
