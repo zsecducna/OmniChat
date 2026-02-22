@@ -637,9 +637,25 @@ private struct TokenResponse: Codable {
 extension OAuthManager: ASWebAuthenticationPresentationContextProviding {
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         #if os(iOS) || os(visionOS)
-        return UIWindow()
+        // Get the key window from the active scene
+        // This is called from the main thread by ASWebAuthenticationSession
+        let window = MainActor.assumeIsolated {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let keyWindow = windowScene.windows.first {
+                return keyWindow
+            }
+            return UIWindow()
+        }
+        return window
         #elseif os(macOS)
-        return NSWindow()
+        // Get the key window from the app
+        let window = MainActor.assumeIsolated {
+            if let keyWindow = NSApplication.shared.windows.first {
+                return keyWindow
+            }
+            return NSWindow()
+        }
+        return window
         #endif
     }
 }
