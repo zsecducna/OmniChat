@@ -53,7 +53,6 @@ struct ChatView: View {
     // MARK: - State
 
     @State private var inputText = ""
-    @State private var isStreaming = false
     @State private var isLoadingOlder = false
 
     // MARK: - Constants
@@ -65,7 +64,7 @@ struct ChatView: View {
 
     /// Messages sorted by creation date.
     private var messages: [Message] {
-        conversation.messages.sorted { $0.createdAt < $1.createdAt }
+        (conversation.messages ?? []).sorted { $0.createdAt < $1.createdAt }
     }
 
     /// Color for the send button based on input state.
@@ -180,10 +179,14 @@ struct ChatView: View {
                             .id(message.id)
                     }
 
-                    // Streaming indicator
-                    if isStreaming {
-                        streamingIndicator
-                            .id("streaming")
+                    // Streaming indicator with real-time text
+                    if viewModel?.isStreaming == true {
+                        StreamingTextView(
+                            text: viewModel?.streamingText ?? "",
+                            isStreaming: true,
+                            providerConfigID: conversation.providerConfigID
+                        )
+                        .id("streaming")
                     }
 
                     // Scroll anchor at bottom
@@ -200,9 +203,9 @@ struct ChatView: View {
                     scrollToBottom(proxy: proxy)
                 }
             }
-            .onChange(of: isStreaming) { _, streaming in
+            .onChange(of: viewModel?.isStreaming) { _, streaming in
                 // Scroll to streaming indicator when streaming starts
-                if streaming {
+                if streaming == true {
                     withAnimation(.easeInOut(duration: Theme.Animation.default)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
@@ -257,21 +260,6 @@ struct ChatView: View {
         .accessibilityAddTraits(.isHeader)
     }
 
-    // MARK: - Streaming Indicator
-
-    private var streamingIndicator: some View {
-        HStack(spacing: Theme.Spacing.extraSmall.rawValue) {
-            // Animated typing dots
-            TypingIndicator()
-        }
-        .padding(Theme.Spacing.medium.rawValue)
-        .background(Theme.Colors.assistantMessageBackground)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("AI is generating response")
-        .accessibilityAddTraits(.updatesFrequently)
-    }
-
     // MARK: - Input Bar View
 
     private var inputBarView: some View {
@@ -285,7 +273,7 @@ struct ChatView: View {
                     .foregroundStyle(Theme.Colors.tertiaryText)
             }
             .buttonStyle(.plain)
-            .disabled(isStreaming)
+            .disabled(viewModel?.isStreaming == true)
             .accessibilityLabel("Add attachment")
             .accessibilityHint("Opens file picker to add attachments")
             #if os(macOS)
@@ -298,7 +286,7 @@ struct ChatView: View {
                     .textFieldStyle(.plain)
                     .font(Theme.Typography.body)
                     .lineLimit(1...6)
-                    .disabled(isStreaming)
+                    .disabled(viewModel?.isStreaming == true)
                     .onSubmit {
                         #if os(macOS)
                         // On macOS, Enter sends, Shift+Enter adds newline
@@ -321,9 +309,9 @@ struct ChatView: View {
                     .foregroundStyle(sendButtonColor)
             }
             .buttonStyle(.plain)
-            .disabled(inputText.isEmpty || isStreaming)
+            .disabled(inputText.isEmpty || viewModel?.isStreaming == true)
             .keyboardShortcut(.defaultAction) // Cmd+Enter on Mac
-            .accessibilityLabel(isStreaming ? "Generating response" : "Send message")
+            .accessibilityLabel(viewModel?.isStreaming == true ? "Generating response" : "Send message")
             .accessibilityHint(inputText.isEmpty ? "Type a message to send" : "Sends your message")
         }
         .padding(.horizontal, Theme.Spacing.medium.rawValue)
@@ -405,13 +393,13 @@ struct ChatView: View {
         ToolbarItem(placement: .automatic) {
             Button {
                 // Cancel streaming
-                if isStreaming {
-                    // TODO: Cancel generation via ChatViewModel
+                if viewModel?.isStreaming == true {
+                    viewModel?.stopGeneration()
                 }
             } label: {
-                Image(systemName: isStreaming ? "stop.circle" : "ellipsis.circle")
+                Image(systemName: viewModel?.isStreaming == true ? "stop.circle" : "ellipsis.circle")
             }
-            .help(isStreaming ? "Stop generating" : "More options")
+            .help(viewModel?.isStreaming == true ? "Stop generating" : "More options")
         }
         #endif
     }
@@ -420,7 +408,7 @@ struct ChatView: View {
 
     /// Gets the placeholder text for the input field based on current model.
     private func getPlaceholderText() -> String {
-        if isStreaming {
+        if viewModel?.isStreaming == true {
             return "Generating..."
         }
         return "Message \(modelDisplayName)..."
@@ -436,7 +424,7 @@ struct ChatView: View {
     /// Sends the current message and triggers AI response.
     private func sendMessage() {
         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        guard !isStreaming else { return }
+        guard viewModel?.isStreaming != true else { return }
 
         // Trigger haptic feedback on send
         triggerSendHaptic()
@@ -446,57 +434,24 @@ struct ChatView: View {
         // Clear any existing error
         currentError = nil
 
-        // Create user message
-        let userMessage = Message(
-            role: .user,
-            content: trimmedText,
-            conversation: conversation
-        )
-        modelContext.insert(userMessage)
-
-        // Update conversation
-        conversation.updatedAt = Date()
-
         // Clear input
         inputText = ""
 
-        // Start streaming indicator (will be connected to ChatViewModel in TASK-2.6)
-        isStreaming = true
-
-        // TODO: Trigger AI response via ChatViewModel (TASK-2.6)
-        // For now, simulate a response after a delay
+        // Send via view model (creates user message, streams AI response, creates assistant message)
         Task {
-            try? await Task.sleep(for: .seconds(2))
-            await MainActor.run {
-                let assistantMessage = Message(
-                    role: .assistant,
-                    content: "This is a placeholder response. The ChatViewModel will be implemented in TASK-2.6 to connect to the actual AI provider.",
-                    conversation: conversation
-                )
-                assistantMessage.outputTokens = 25
-                modelContext.insert(assistantMessage)
-                conversation.updatedAt = Date()
-                isStreaming = false
-            }
+            await viewModel?.sendMessage(trimmedText)
         }
     }
 
     /// Retries the last message (used by error banner).
     private func retryLastMessage() {
         currentError = nil
+        viewModel?.clearError()
 
-        // Find last user message and re-send
-        let messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
-        guard let lastUserMessage = messages.last(where: { $0.role == .user }) else { return }
-
-        // Delete last assistant message if exists
-        if let lastAssistantMessage = messages.last(where: { $0.role == .assistant }) {
-            modelContext.delete(lastAssistantMessage)
+        // Retry via view model
+        Task {
+            await viewModel?.retryLastMessage()
         }
-
-        // Re-send
-        inputText = lastUserMessage.content
-        sendMessage()
     }
 
     // MARK: - Haptic Feedback
@@ -509,37 +464,6 @@ struct ChatView: View {
     #else
     private func triggerSendHaptic() {}
     #endif
-}
-
-// MARK: - Typing Indicator
-
-/// Animated typing indicator with three bouncing dots.
-private struct TypingIndicator: View {
-    @State private var isAnimating = false
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<3, id: \.self) { index in
-                Circle()
-                    .fill(Theme.Colors.tertiaryText)
-                    .frame(width: 4, height: 4)
-                    .offset(y: isAnimating ? -3 : 0)
-                    .animation(
-                        .easeInOut(duration: 0.3)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.15),
-                        value: isAnimating
-                    )
-            }
-        }
-        .onAppear {
-            isAnimating = true
-        }
-        .onDisappear {
-            isAnimating = false
-        }
-        .accessibilityHidden(true) // Decorative element, parent has label
-    }
 }
 
 // MARK: - Preview
