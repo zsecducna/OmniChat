@@ -20,6 +20,53 @@ Ads integration is optional and should only be added after the app is stable in 
 
 ---
 
+## Recent Enhancements
+
+### Conversation Management Features — Added 2026-02-22
+
+| Feature | File | Description |
+|---------|------|-------------|
+| Rename Conversation | `ConversationListView.swift` | Context menu with "Rename" option, shows alert with text field |
+| Delete Conversation | `ConversationListView.swift`, `ChatView.swift` | Context menu and toolbar delete with confirmation dialog |
+| Model Search (macOS) | `ModelSwitcher.swift` | Popover with search for providers with >10 models, menu for fewer |
+| Persona Picker | `ChatView.swift` | Added PersonaPicker in toolbar for new conversations (before first message) |
+| Default Persona | `Persona.swift`, `PersonaListView.swift`, `ContentView.swift` | isDefault property, setAsDefault() method, swipe action, Default badge |
+
+**Implementation Details:**
+
+1. **Conversation Name Editing**
+   - Added context menu with "Rename" option in ConversationListView
+   - Shows alert with text field pre-populated with current title
+   - Uses conversation.touch() to update timestamp
+
+2. **Delete Conversation**
+   - Context menu delete in ConversationListView with confirmation dialog
+   - Toolbar delete button in ChatView (Mac and iOS)
+   - Properly clears selection and dismisses view
+
+3. **Model Searching in ModelSwitcher**
+   - iOS: Already had search in sheet
+   - macOS: Added ModelPickerPopover with search field
+   - Uses popover when totalModelCount > 10, menu otherwise
+   - Groups models by provider type with section headers
+
+4. **Persona Selection for Conversation**
+   - PersonaPicker added to ChatView toolbar
+   - Only shown when conversation is new (no messages yet)
+   - Mac menu includes persona selection with Divider
+   - Bound to conversation.personaID
+
+5. **Default Persona Configuration**
+   - Added `isDefault: Bool` to Persona model
+   - Added `fetchDefault(from:)` static method
+   - Added `setAsDefault(in:)` method that clears other defaults
+   - Added swipe action "Set as Default" in PersonaListView
+   - Added "Default" badge (orange/star) to persona rows
+   - ContentView.createNewConversation() uses default persona
+   - Fallback to default persona if none selected for conversation
+
+---
+
 ## New Provider Additions
 
 ### Z.AI (GLM Models) — Added 2026-02-22
