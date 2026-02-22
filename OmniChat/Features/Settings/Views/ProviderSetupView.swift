@@ -5,13 +5,14 @@
 //  Multi-step form for adding or editing a provider configuration.
 //  Implements TASK-3.3: Provider configuration UI with validation.
 //  Updated for TASK-7.3: Ollama and Custom provider support.
+//  Updated for TASK-9.4: OAuth authentication support.
 //
 //  Steps:
 //  1. Select provider type (Anthropic / OpenAI / Ollama / Custom)
 //  2. Configure authentication (varies by provider type)
-//     - Anthropic/OpenAI: API Key
+//     - Anthropic/OpenAI: API Key or OAuth (if supported)
 //     - Ollama: Base URL only (no auth)
-//     - Custom: Base URL, API path, headers, format options
+//     - Custom: Base URL, API path, headers, format options, optional OAuth
 //  3. Model selection (auto-fetched or manual)
 //  4. Advanced settings (base URL override, headers, etc.)
 //
@@ -113,6 +114,22 @@ struct ProviderSetupView: View {
     @State private var isTestingConnection = false
     @State private var connectionTestResult: ConnectionTestResult?
 
+    // MARK: - OAuth State
+
+    /// The selected authentication method for the provider.
+    @State private var selectedAuthMethod: AuthMethod = .apiKey
+    /// Whether an OAuth flow is currently in progress.
+    @State private var isOAuthInProgress = false
+    /// The OAuth status for the current provider.
+    @State private var oAuthStatus: OAuthStatus = .notAuthenticated
+    /// The email address associated with the OAuth account (if available).
+    @State private var oAuthEmail: String?
+    /// OAuth configuration fields for custom providers.
+    @State private var oauthClientID = ""
+    @State private var oauthAuthURL = ""
+    @State private var oauthTokenURL = ""
+    @State private var oauthScopes = ""
+
     // MARK: - Connection Test Result
 
     enum ConnectionTestResult: Equatable {
@@ -129,6 +146,20 @@ struct ProviderSetupView: View {
                 return false
             }
         }
+    }
+
+    // MARK: - OAuth Status
+
+    /// The authentication status for OAuth providers.
+    enum OAuthStatus: Equatable {
+        /// Not authenticated - user needs to sign in
+        case notAuthenticated
+        /// Authenticated successfully - tokens are valid
+        case authenticated
+        /// Token expired - user needs to re-authenticate
+        case expired
+        /// Authentication failed with an error
+        case failed(String)
     }
 
     // MARK: - Computed Properties
@@ -305,21 +336,551 @@ struct ProviderSetupView: View {
 
     private var authConfigurationStep: some View {
         Form {
+            // Auth method picker (if multiple methods available)
+            if availableAuthMethods.count > 1 {
+                authMethodPickerSection
+            }
+
             switch providerType {
             case .anthropic, .openai:
-                apiKeySection
-                validationSection
+                switch selectedAuthMethod {
+                case .apiKey:
+                    apiKeySection
+                    validationSection
+                case .oauth:
+                    oAuthSection
+                default:
+                    apiKeySection
+                    validationSection
+                }
 
             case .ollama:
                 ollamaConfigurationSection
 
             case .custom:
-                customProviderConfigurationSection
+                switch selectedAuthMethod {
+                case .apiKey:
+                    customProviderConfigurationSection
+                case .oauth:
+                    customProviderOAuthSection
+                case .none:
+                    customProviderNoAuthSection
+                case .bearer:
+                    customProviderBearerSection
+                }
             }
         }
         .formStyle(.grouped)
         .safeAreaInset(edge: .bottom) {
             continueButton(canProceed: canProceedFromAuthStep)
+        }
+    }
+
+    // MARK: - Auth Method Picker Section
+
+    private var authMethodPickerSection: some View {
+        Section {
+            Picker("Authentication Method", selection: $selectedAuthMethod) {
+                ForEach(availableAuthMethods, id: \.self) { method in
+                    Text(method.displayName).tag(method)
+                }
+            }
+            #if os(iOS)
+            .pickerStyle(.segmented)
+            #else
+            .pickerStyle(.segmented)
+            #endif
+        } footer: {
+            Text(authMethodFooter)
+        }
+    }
+
+    private var authMethodFooter: String {
+        switch selectedAuthMethod {
+        case .apiKey:
+            return "Enter your API key to authenticate with the provider"
+        case .oauth:
+            return "Sign in with your account to authenticate via OAuth"
+        case .bearer:
+            return "Enter a bearer token for authentication"
+        case .none:
+            return "No authentication required for this provider"
+        }
+    }
+
+    // MARK: - OAuth Section
+
+    private var oAuthSection: some View {
+        Group {
+            // OAuth Configuration (for custom providers)
+            if providerType == .custom {
+                Section {
+                    TextField("Client ID", text: $oauthClientID)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        #endif
+
+                    TextField("Authorization URL", text: $oauthAuthURL)
+                        .textContentType(.URL)
+                        #if os(iOS)
+                        .keyboardType(.URL)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        #endif
+
+                    TextField("Token URL", text: $oauthTokenURL)
+                        .textContentType(.URL)
+                        #if os(iOS)
+                        .keyboardType(.URL)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        #endif
+
+                    TextField("Scopes (comma-separated)", text: $oauthScopes)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        #endif
+                } header: {
+                    Text("OAuth Configuration")
+                } footer: {
+                    Text("Enter the OAuth configuration provided by your API provider")
+                }
+            }
+
+            // OAuth Status and Sign In Button
+            Section {
+                oAuthStatusView
+            } header: {
+                Text("Sign In")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var oAuthStatusView: some View {
+        switch oAuthStatus {
+        case .notAuthenticated:
+            Button {
+                startOAuthFlow()
+            } label: {
+                HStack {
+                    Spacer()
+                    if isOAuthInProgress {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Label("Sign in with \(providerType.displayName)", systemImage: "person.badge.key")
+                            .font(Theme.Typography.headline)
+                    }
+                    Spacer()
+                }
+            }
+            .disabled(isOAuthInProgress || !oauthConfigIsValid)
+            .buttonStyle(.borderedProminent)
+
+            if !oauthConfigIsValid && providerType == .custom {
+                Label("Complete OAuth configuration above", systemImage: "info.circle")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.secondaryText)
+            }
+
+        case .authenticated:
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Theme.Colors.success)
+                    .font(.title3)
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.tight.rawValue) {
+                    Text("Connected")
+                        .font(Theme.Typography.headline)
+                        .foregroundStyle(Theme.Colors.text.resolve(in: colorScheme))
+
+                    if let email = oAuthEmail {
+                        Text(email)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    } else {
+                        Text("Successfully authenticated")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
+                }
+
+                Spacer()
+
+                Button("Sign Out") {
+                    signOutOAuth()
+                }
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Colors.destructive)
+            }
+
+        case .expired:
+            VStack(alignment: .leading, spacing: Theme.Spacing.small.rawValue) {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Theme.Colors.warning)
+                        .font(.title3)
+
+                    VStack(alignment: .leading) {
+                        Text("Session Expired")
+                            .font(Theme.Typography.headline)
+                            .foregroundStyle(Theme.Colors.text.resolve(in: colorScheme))
+
+                        Text("Your authentication has expired. Please sign in again.")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
+                }
+
+                Button {
+                    startOAuthFlow()
+                } label: {
+                    HStack {
+                        Spacer()
+                        if isOAuthInProgress {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Label("Reconnect", systemImage: "arrow.clockwise")
+                                .font(Theme.Typography.body)
+                        }
+                        Spacer()
+                    }
+                }
+                .disabled(isOAuthInProgress)
+                .buttonStyle(.borderedProminent)
+            }
+
+        case .failed(let error):
+            VStack(alignment: .leading, spacing: Theme.Spacing.small.rawValue) {
+                Label(error, systemImage: "xmark.circle.fill")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.destructive)
+
+                Button {
+                    startOAuthFlow()
+                } label: {
+                    HStack {
+                        Spacer()
+                        if isOAuthInProgress {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Label("Try Again", systemImage: "arrow.clockwise")
+                                .font(Theme.Typography.body)
+                        }
+                        Spacer()
+                    }
+                }
+                .disabled(isOAuthInProgress)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    /// Whether the OAuth configuration is valid for starting a flow.
+    private var oauthConfigIsValid: Bool {
+        switch providerType {
+        case .anthropic, .openai:
+            // Built-in providers have hardcoded OAuth configs
+            return true
+        case .custom:
+            // Custom providers need user-provided config
+            return !oauthClientID.isEmpty && !oauthAuthURL.isEmpty && !oauthTokenURL.isEmpty
+        case .ollama:
+            return false
+        }
+    }
+
+    // MARK: - Custom Provider OAuth Section
+
+    private var customProviderOAuthSection: some View {
+        Group {
+            // Base URL and API configuration
+            Section {
+                TextField("Base URL", text: $baseURL)
+                    .textContentType(.URL)
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("Base URL")
+            } footer: {
+                Text("The base URL for the API (e.g., https://api.example.com)")
+            }
+
+            // API Path
+            Section {
+                TextField("API Path", text: $apiPath)
+                    .textContentType(.URL)
+                    #if os(iOS)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("API Path")
+            } footer: {
+                Text("The path appended to the base URL (default: /v1/chat/completions)")
+            }
+
+            // API Format
+            Section {
+                Picker("Format", selection: $apiFormat) {
+                    ForEach(APIFormat.allCases, id: \.self) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #else
+                .pickerStyle(.menu)
+                #endif
+            } header: {
+                Text("API Format")
+            } footer: {
+                Text(apiFormat.description)
+            }
+
+            // Streaming Format
+            Section {
+                Picker("Streaming", selection: $streamingFormat) {
+                    ForEach(StreamingFormat.allCases, id: \.self) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #else
+                .pickerStyle(.menu)
+                #endif
+            } header: {
+                Text("Streaming Format")
+            } footer: {
+                Text(streamingFormat.supportsStreaming ? "Responses will be streamed in real-time" : "Responses will be returned in full")
+            }
+
+            // OAuth Section
+            oAuthSection
+        }
+    }
+
+    // MARK: - Custom Provider No Auth Section
+
+    private var customProviderNoAuthSection: some View {
+        Group {
+            // Base URL
+            Section {
+                TextField("Base URL", text: $baseURL)
+                    .textContentType(.URL)
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("Base URL")
+            } footer: {
+                Text("The base URL for the API (e.g., https://api.example.com)")
+            }
+
+            // API Path
+            Section {
+                TextField("API Path", text: $apiPath)
+                    .textContentType(.URL)
+                    #if os(iOS)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("API Path")
+            } footer: {
+                Text("The path appended to the base URL (default: /v1/chat/completions)")
+            }
+
+            // API Format
+            Section {
+                Picker("Format", selection: $apiFormat) {
+                    ForEach(APIFormat.allCases, id: \.self) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #else
+                .pickerStyle(.menu)
+                #endif
+            } header: {
+                Text("API Format")
+            } footer: {
+                Text(apiFormat.description)
+            }
+
+            // Streaming Format
+            Section {
+                Picker("Streaming", selection: $streamingFormat) {
+                    ForEach(StreamingFormat.allCases, id: \.self) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #else
+                .pickerStyle(.menu)
+                #endif
+            } header: {
+                Text("Streaming Format")
+            } footer: {
+                Text(streamingFormat.supportsStreaming ? "Responses will be streamed in real-time" : "Responses will be returned in full")
+            }
+
+            // Test Connection
+            Section {
+                Button {
+                    testCustomProviderConnection()
+                } label: {
+                    HStack {
+                        Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        if isTestingConnection {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                    }
+                }
+                .disabled(baseURL.isEmpty || isTestingConnection)
+
+                if let result = connectionTestResult {
+                    switch result {
+                    case .success:
+                        Label("Connected successfully", systemImage: "checkmark.circle")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.success)
+                    case .failure(let message):
+                        Label(message, systemImage: "xmark.circle")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.destructive)
+                    }
+                }
+            } header: {
+                Text("Connection")
+            } footer: {
+                Text("Test your configuration before saving")
+            }
+        }
+    }
+
+    // MARK: - Custom Provider Bearer Section
+
+    private var customProviderBearerSection: some View {
+        Group {
+            // Base URL
+            Section {
+                TextField("Base URL", text: $baseURL)
+                    .textContentType(.URL)
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("Base URL")
+            } footer: {
+                Text("The base URL for the API (e.g., https://api.example.com)")
+            }
+
+            // Bearer Token
+            Section {
+                SecureField("Bearer Token", text: $apiKey)
+                    .textContentType(.password)
+                    #if os(iOS)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("Bearer Token")
+            } footer: {
+                Text("Your bearer token for authentication")
+            }
+
+            // API Path, Format, etc. (reuse from existing)
+            Section {
+                TextField("API Path", text: $apiPath)
+                    #if os(iOS)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("API Path")
+            }
+
+            Section {
+                Picker("Format", selection: $apiFormat) {
+                    ForEach(APIFormat.allCases, id: \.self) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #else
+                .pickerStyle(.menu)
+                #endif
+            } header: {
+                Text("API Format")
+            }
+
+            Section {
+                Picker("Streaming", selection: $streamingFormat) {
+                    ForEach(StreamingFormat.allCases, id: \.self) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #else
+                .pickerStyle(.menu)
+                #endif
+            } header: {
+                Text("Streaming Format")
+            }
+
+            // Test Connection
+            Section {
+                Button {
+                    testCustomProviderConnection()
+                } label: {
+                    HStack {
+                        Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        if isTestingConnection {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                    }
+                }
+                .disabled(baseURL.isEmpty || isTestingConnection)
+
+                if let result = connectionTestResult {
+                    switch result {
+                    case .success:
+                        Label("Connected successfully", systemImage: "checkmark.circle")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.success)
+                    case .failure(let message):
+                        Label(message, systemImage: "xmark.circle")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.destructive)
+                    }
+                }
+            } header: {
+                Text("Connection")
+            }
         }
     }
 
@@ -607,13 +1168,52 @@ struct ProviderSetupView: View {
     private var canProceedFromAuthStep: Bool {
         switch providerType {
         case .anthropic, .openai:
-            return isValidated
+            switch selectedAuthMethod {
+            case .apiKey:
+                return isValidated
+            case .oauth:
+                return oAuthStatus == .authenticated
+            default:
+                return isValidated
+            }
         case .ollama:
             // For Ollama, we just need a non-empty base URL or accept the default
             return true
         case .custom:
             // For custom, we need a base URL
-            return !baseURL.trimmingCharacters(in: .whitespaces).isEmpty
+            guard !baseURL.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+            // If OAuth is selected, we need to be authenticated
+            if selectedAuthMethod == .oauth {
+                return oAuthStatus == .authenticated
+            }
+            return true
+        }
+    }
+
+    // MARK: - OAuth Support Check
+
+    /// Whether the current provider type supports OAuth authentication.
+    private var supportsOAuth: Bool {
+        switch providerType {
+        case .custom:
+            return true
+        case .anthropic, .openai:
+            // Future-proof: these may support OAuth in the future
+            return false
+        case .ollama:
+            return false
+        }
+    }
+
+    /// Available authentication methods for the current provider type.
+    private var availableAuthMethods: [AuthMethod] {
+        switch providerType {
+        case .anthropic, .openai:
+            return [.apiKey]
+        case .ollama:
+            return [.none]
+        case .custom:
+            return [.apiKey, .oauth, .none]
         }
     }
 
@@ -819,21 +1419,62 @@ struct ProviderSetupView: View {
         selectedModelID = provider.defaultModelID
         baseURL = provider.baseURL ?? ""
         availableModels = provider.availableModels
+        selectedAuthMethod = provider.authMethod
 
         // Load custom headers for custom providers
         if providerType == .custom {
             customHeaders = provider.customHeaders.map { (key: $0.key, value: $0.value) }
         }
 
-        // Load API key from Keychain (only for providers that use it)
-        switch providerType {
-        case .anthropic, .openai, .custom:
+        // Load OAuth configuration for custom providers
+        if providerType == .custom {
+            oauthClientID = provider.oauthClientID ?? ""
+            oauthAuthURL = provider.oauthAuthURL ?? ""
+            oauthTokenURL = provider.oauthTokenURL ?? ""
+            oauthScopes = provider.oauthScopes.joined(separator: ", ")
+        }
+
+        // Load authentication state based on auth method
+        switch provider.authMethod {
+        case .apiKey:
+            // Load API key from Keychain
+            switch providerType {
+            case .anthropic, .openai, .custom:
+                if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
+                    apiKey = key
+                    isValidated = true
+                }
+            case .ollama:
+                isValidated = true
+                connectionTestResult = nil
+            }
+
+        case .oauth:
+            // Load OAuth tokens from Keychain
+            do {
+                let (_, _, expiry) = try KeychainManager.shared.readOAuthTokens(providerID: provider.id)
+                if let expiry = expiry {
+                    if expiry > Date() {
+                        oAuthStatus = .authenticated
+                    } else {
+                        oAuthStatus = .expired
+                    }
+                } else {
+                    // No expiry stored, assume valid
+                    oAuthStatus = .authenticated
+                }
+            } catch {
+                oAuthStatus = .notAuthenticated
+            }
+
+        case .bearer:
+            // Load bearer token as API key
             if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
                 apiKey = key
                 isValidated = true
             }
-        case .ollama:
-            // Ollama doesn't use API keys, mark as validated
+
+        case .none:
             isValidated = true
             connectionTestResult = nil
         }
@@ -1208,16 +1849,22 @@ struct ProviderSetupView: View {
         // Build custom headers dictionary
         let headersDict = Dictionary(uniqueKeysWithValues: customHeaders.filter { !$0.key.isEmpty }.map { ($0.key, $0.value) })
 
-        // Determine auth method based on provider type
+        // Determine auth method based on provider type and selection
         let authMethod: AuthMethod
         switch providerType {
         case .anthropic, .openai:
-            authMethod = .apiKey
+            authMethod = selectedAuthMethod == .oauth ? .oauth : .apiKey
         case .ollama:
             authMethod = .none
         case .custom:
-            authMethod = apiKey.isEmpty ? .none : .apiKey
+            authMethod = selectedAuthMethod
         }
+
+        // Build OAuth scopes array
+        let scopesArray = oauthScopes
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
 
         if let existing = provider {
             config = existing
@@ -1228,6 +1875,15 @@ struct ProviderSetupView: View {
             config.availableModels = availableModels
             config.customHeaders = headersDict
             config.authMethod = authMethod
+
+            // Save OAuth configuration for custom providers
+            if providerType == .custom && authMethod == .oauth {
+                config.oauthClientID = oauthClientID.isEmpty ? nil : oauthClientID
+                config.oauthAuthURL = oauthAuthURL.isEmpty ? nil : oauthAuthURL
+                config.oauthTokenURL = oauthTokenURL.isEmpty ? nil : oauthTokenURL
+                config.oauthScopes = scopesArray
+            }
+
             config.touch()
         } else {
             config = ProviderConfig(
@@ -1236,24 +1892,115 @@ struct ProviderSetupView: View {
                 baseURL: baseURL.isEmpty ? nil : baseURL,
                 customHeaders: headersDict,
                 authMethod: authMethod,
+                oauthClientID: providerType == .custom && authMethod == .oauth ? (oauthClientID.isEmpty ? nil : oauthClientID) : nil,
+                oauthAuthURL: providerType == .custom && authMethod == .oauth ? (oauthAuthURL.isEmpty ? nil : oauthAuthURL) : nil,
+                oauthTokenURL: providerType == .custom && authMethod == .oauth ? (oauthTokenURL.isEmpty ? nil : oauthTokenURL) : nil,
+                oauthScopes: providerType == .custom && authMethod == .oauth ? scopesArray : nil,
                 availableModels: availableModels,
                 defaultModelID: selectedModelID
             )
             modelContext.insert(config)
         }
 
-        // Save API key to Keychain (only for providers that use it)
-        if !apiKey.isEmpty {
-            do {
-                try KeychainManager.shared.saveAPIKey(apiKey, providerID: config.id)
-            } catch {
-                // Log error but don't fail - the Keychain save might fail in simulator
-                os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
-                    .error("Failed to save API key: \(error.localizedDescription)")
+        // Save credentials to Keychain based on auth method
+        switch authMethod {
+        case .apiKey, .bearer:
+            if !apiKey.isEmpty {
+                do {
+                    try KeychainManager.shared.saveAPIKey(apiKey, providerID: config.id)
+                } catch {
+                    os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
+                        .error("Failed to save API key: \(error.localizedDescription)")
+                }
             }
+
+        case .oauth:
+            // OAuth tokens are already saved during the OAuth flow
+            // No additional action needed here
+            break
+
+        case .none:
+            // No credentials to save
+            break
         }
 
         dismiss()
+    }
+
+    // MARK: - OAuth Actions
+
+    /// Starts the OAuth authentication flow.
+    private func startOAuthFlow() {
+        guard oauthConfigIsValid else { return }
+
+        isOAuthInProgress = true
+
+        Task {
+            do {
+                // Generate a temporary provider ID for OAuth (use existing or new)
+                let providerID = provider?.id ?? UUID()
+
+                // Parse scopes
+                let scopes = oauthScopes
+                    .split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+
+                // Create OAuth config
+                let config = OAuthConfig(
+                    clientID: oauthClientID,
+                    authURL: oauthAuthURL,
+                    tokenURL: oauthTokenURL,
+                    scopes: scopes,
+                    callbackScheme: "omnichat",
+                    usePKCE: true
+                )
+
+                // Use OAuthManager to initiate the flow
+                let token = try await OAuthManager.shared.authenticate(
+                    providerID: providerID,
+                    config: config
+                )
+
+                await MainActor.run {
+                    isOAuthInProgress = false
+                    oAuthStatus = .authenticated
+                    oAuthEmail = nil // Email would require a separate userinfo request
+                }
+            } catch let error as OAuthError {
+                await MainActor.run {
+                    isOAuthInProgress = false
+                    oAuthStatus = .failed(error.description)
+                }
+            } catch {
+                await MainActor.run {
+                    isOAuthInProgress = false
+                    oAuthStatus = .failed(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    /// Signs out from OAuth, clearing stored tokens.
+    private func signOutOAuth() {
+        guard let providerID = provider?.id else {
+            // For new providers, just reset the state
+            oAuthStatus = .notAuthenticated
+            oAuthEmail = nil
+            return
+        }
+
+        do {
+            try OAuthManager.shared.clearTokens(for: providerID)
+            oAuthStatus = .notAuthenticated
+            oAuthEmail = nil
+        } catch {
+            os.Logger(subsystem: Constants.BundleID.base, category: "ProviderSetupView")
+                .error("Failed to delete OAuth tokens: \(error.localizedDescription)")
+            // Still reset the UI state
+            oAuthStatus = .notAuthenticated
+            oAuthEmail = nil
+        }
     }
 
     // MARK: - Helpers

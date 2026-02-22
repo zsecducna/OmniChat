@@ -1,8 +1,8 @@
 # OmniChat Agent Task Board
 
-## Current Phase: Phase 8 — Token Tracking & Usage Dashboard
+## Current Phase: Phase 9 — OAuth Integration
 
-## Phase 0, 1, 2, 3, 4, 5, 6 & 7 Summary (COMPLETE)
+## Phase 0, 1, 2, 3, 4, 5, 6, 7 & 8 Summary (COMPLETE)
 - **Phase 0**: Xcode project, dependencies, directory structure, SwiftData container, design system
 - **Phase 1**: SwiftData models, KeychainManager, AIProvider protocol, HTTPClient, SSEParser, AnthropicAdapter, OpenAIAdapter, ProviderManager
 - **Phase 2**: ContentView, ConversationListView, ChatView, MessageBubble, MessageInputBar, ChatViewModel, StreamingTextView
@@ -11,12 +11,22 @@
 - **Phase 5**: PersonaListView, PersonaEditorView, PersonaPicker, Personas connected to Chat
 - **Phase 6**: CloudKit configuration, Sync conflicts, Attachment thumbnails, UI polish
 - **Phase 7**: OllamaAdapter, CustomAdapter, ProviderSetupView for Ollama/Custom
+- **Phase 8**: UsageRecord queries, UsageDashboardView, CostCalculator
 
 ---
 
 ## Task Status
 
-### Phase 8 Tasks
+### Phase 9 Tasks
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-9.1 | Implement OAuthManager | core | DONE | — | OAuthManager implemented in Core/Auth/OAuthManager.swift with ASWebAuthenticationSession, PKCE support, token refresh, and Keychain integration. Features: (1) authenticate() method for authorization code flow with PKCE; (2) validToken() method that auto-refreshes expired tokens; (3) refreshToken() for manual refresh; (4) Thread-safe refresh lock with pendingRefreshes dictionary; (5) OAuthToken struct with expiry tracking; (6) OAuthError enum for error handling; (7) ASWebAuthenticationPresentationContextProviding conformance. Both iOS and macOS builds succeed. |
+| TASK-9.2 | Add PKCE Support | core | DONE | — | PKCE implemented in Core/Auth/PKCE.swift. Features: (1) PKCE struct with codeVerifier, codeChallenge, challengeMethod; (2) S256 challenge method using SHA256; (3) PKCE.generate() for random verifier generation; (4) URL-safe base64 encoding; (5) OAuthConfig extension with authorizationURL(pkce:state:) method; (6) CommonCrypto integration for SHA256. Both iOS and macOS builds succeed. |
+| TASK-9.3 | Implement Token Refresh | core | DONE | — | Token refresh implemented in OAuthManager.swift. Features: (1) validToken(for:config:) checks expiry and auto-refreshes; (2) refreshToken() method with race condition prevention; (3) pendingRefreshes dictionary to prevent duplicate refresh requests; (4) Token expiry stored in Keychain via ISO8601 date; (5) Automatic 5-minute buffer before expiry. Both iOS and macOS builds succeed. |
+| TASK-9.4 | Update ProviderSetupView for OAuth | ui | DONE | — | ProviderSetupView updated in Features/Settings/Views/ProviderSetupView.swift with OAuth authentication support. Features: (1) Auth method picker (segmented control) for providers with multiple auth options; (2) OAuth status display: not authenticated / authenticated / expired / failed; (3) Sign in button styled per platform; (4) OAuth configuration fields for custom providers (client ID, auth URL, token URL, scopes); (5) Loading state during auth flow; (6) Sign out button to clear tokens; (7) Reconnect button for expired tokens; (8) loadProviderData() updated to load OAuth state and auth method; (9) saveProvider() updated to save OAuth config and use selected auth method; (10) OAuthStatus enum for tracking authentication state; (11) availableAuthMethods and supportsOAuth computed properties; (12) Custom provider OAuth section with base URL, API path, format pickers, and OAuth flow; (13) Custom provider no-auth section; (14) Custom provider bearer token section. Fixed visibility of OAuthConfig and PKCE types by making them public. Both iOS and macOS builds succeed. |
+
+### Phase 8 Tasks (COMPLETE)
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
@@ -96,10 +106,11 @@
 
 ## Blockers
 
-None - Phase 7 complete. Both iOS and macOS builds succeed.
+None - Phase 8 complete. Both iOS and macOS builds succeed.
 
 ## Decisions Log
 
+- [2026-02-22] PHASE 8 COMPLETE: All 3 Phase 8 tasks completed. Token Tracking & Usage Dashboard is fully implemented. Key accomplishments: (1) UsageRecord enhanced with query methods (fetchByDateRange, fetchByProvider, fetchByConversation, fetchTotalUsage, fetchDailyUsage) and aggregate statistics (UsageStatistics, ProviderUsageStats, ModelUsageStats, DailyUsageStats); (2) UsageDashboardView with SwiftUI Charts showing daily usage bar charts, provider pie charts, model breakdown, and recent activity list; (3) CostCalculator with model-specific pricing for all major AI models (Claude, GPT, Ollama). Both iOS and macOS builds succeed. Ready for Phase 9 (OAuth Integration).
 - [2026-02-22] PHASE 7 COMPLETE: All 3 Phase 7 tasks completed. Ollama & Custom Providers are now supported. Key accomplishments: (1) OllamaAdapter with NDJSON streaming, local server support, no auth; (2) CustomAdapter with configurable API format (OpenAI/Anthropic), streaming format (SSE/NDJSON/None), custom headers; (3) ProviderSetupView updated with Ollama/Custom provider configuration UI. Both iOS and macOS builds succeed. Ready for Phase 8 (Token Tracking & Usage Dashboard).
 - [2026-02-22] TASK-7.2 completed: CustomAdapter implemented in Core/Provider/Adapters/CustomAdapter.swift. Features: (1) Conforms to AIProvider protocol with full streaming support; (2) Reads all config from ProviderConfigSnapshot (baseURL, apiPath, apiFormat, streamingFormat, customHeaders, apiKeyHeader, apiKeyPrefix); (3) Two API format modes: OpenAI-compatible (reuses OpenAI request/response parsing logic) and Anthropic-compatible (reuses Anthropic request/response parsing logic); (4) Three streaming formats: SSE (Server-Sent Events via SSEParser), NDJSON (Newline-Delimited JSON), none (non-streaming); (5) Configurable authentication via custom header name and prefix; (6) Vision support for both API formats; (7) Token counting from streaming metadata; (8) Optional API key (nil for no auth). Added new enums to ProviderConfig.swift: APIFormat (openAI, anthropic) with defaultAPIPath property, StreamingFormat (sse, ndjson, none) with supportsStreaming property. Added new fields to ProviderConfig: apiPath, apiFormatRaw, streamingFormatRaw, apiKeyHeader, apiKeyPrefix. Updated ProviderConfigSnapshot with all new fields. Updated ProviderManager to create CustomAdapter instances. This is the "escape hatch" for any provider - users can configure arbitrary OpenAI/Anthropic-compatible APIs.
 - [2026-02-22] TASK-7.1 completed: OllamaAdapter implemented in Core/Provider/Adapters/OllamaAdapter.swift. Features: (1) NDJSON streaming support (newline-delimited JSON); (2) Chat API via POST /api/chat with messages array; (3) Model listing via GET /api/tags; (4) No authentication required; (5) Vision support via base64 images array; (6) Default models fallback when server unreachable (llama3.2, mistral, codellama, phi3, gemma2, llava); (7) Token counts from eval_count and prompt_eval_count in final chunk; (8) Updated ProviderManager to create OllamaAdapter instances.
