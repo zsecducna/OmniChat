@@ -141,7 +141,7 @@ enum DataManager {
     ///
     /// This container:
     /// - Stores all data in memory (not persisted to disk)
-    /// - Does not sync with CloudKit
+    /// - Does not sync with CloudKit (explicitly disabled)
     /// - Is suitable for SwiftUI previews and unit tests
     ///
     /// - Returns: A configured in-memory `ModelContainer`.
@@ -149,11 +149,13 @@ enum DataManager {
     /// - Warning: Data in this container is not persisted and will be lost
     ///            when the container is deallocated.
     static func createPreviewContainer() -> ModelContainer {
-        logger.info("Creating in-memory preview ModelContainer")
+        logger.info("Creating in-memory preview ModelContainer (CloudKit disabled)")
 
+        // Explicitly disable CloudKit to avoid schema validation issues in tests
         let configuration = ModelConfiguration(
             schema: schema,
-            isStoredInMemoryOnly: true
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
         )
 
         do {
@@ -252,6 +254,7 @@ extension DataManager {
     ///
     /// - Note: SwiftData automatically handles local-to-CloudKit migration for
     ///         most cases. This method is for additional custom setup if needed.
+    @MainActor
     static func performFirstTimeSetupIfNeeded(container: ModelContainer) {
         let isFirstTime = !isiCloudEnabled()
 

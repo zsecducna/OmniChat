@@ -16,10 +16,10 @@ enum MessageRole: String, Codable {
 
 @Model
 final class Message {
-    var id: UUID
-    var role: MessageRole
-    var content: String
-    var createdAt: Date
+    var id: UUID = UUID()
+    var role: MessageRole = MessageRole.user
+    var content: String = ""
+    var createdAt: Date = Date()
     var providerConfigID: UUID?
     var modelID: String?
     var inputTokens: Int?
@@ -27,7 +27,7 @@ final class Message {
     var durationMs: Int?
 
     @Relationship(deleteRule: .cascade, inverse: \Attachment.message)
-    var attachments: [Attachment] = []
+    var attachments: [Attachment]?
 
     var conversation: Conversation?
 

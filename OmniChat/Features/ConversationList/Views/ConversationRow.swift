@@ -19,7 +19,7 @@ struct ConversationRow: View {
 
     /// The last message in the conversation, if any.
     private var lastMessage: Message? {
-        conversation.messages.last
+        conversation.messages?.last
     }
 
     /// A preview of the last message content.
@@ -133,7 +133,7 @@ struct ConversationRow: View {
             let conv = Conversation(title: "Swift Programming Help", isPinned: true)
             let msg = Message(role: .assistant, content: "Here's how you can implement the feature using SwiftUI...")
             msg.conversation = conv
-            conv.messages.append(msg)
+            conv.messages = [msg]
             conv.providerConfigID = UUID()
             return conv
         }())
@@ -142,7 +142,7 @@ struct ConversationRow: View {
             let conv = Conversation(title: "API Integration", isPinned: false)
             let msg = Message(role: .user, content: "How do I connect to the API?")
             msg.conversation = conv
-            conv.messages.append(msg)
+            conv.messages = [msg]
             return conv
         }())
 
@@ -155,7 +155,7 @@ struct ConversationRow: View {
             let conv = Conversation(title: "Long Conversation Title That Should Be Truncated When Displayed In The List")
             let msg = Message(role: .assistant, content: "This is a very long message that should be truncated when displayed in the conversation list preview. It contains multiple sentences and should show only the first 60 characters followed by an ellipsis.")
             msg.conversation = conv
-            conv.messages.append(msg)
+            conv.messages = [msg]
             conv.providerConfigID = UUID()
             return conv
         }())

@@ -24,7 +24,7 @@ struct ConversationTests {
         #expect(conversation.totalInputTokens == 0)
         #expect(conversation.totalOutputTokens == 0)
         #expect(conversation.estimatedCostUSD == 0.0)
-        #expect(conversation.messages.isEmpty)
+        #expect((conversation.messages ?? []).isEmpty)
         #expect(conversation.providerConfigID == nil)
         #expect(conversation.modelID == nil)
         #expect(conversation.systemPrompt == nil)
@@ -119,11 +119,11 @@ struct ConversationTests {
         // Add messages
         let olderMessage = Message(role: .user, content: "First")
         olderMessage.createdAt = Date().addingTimeInterval(-100)
-        conversation.messages.append(olderMessage)
+        conversation.messages = [olderMessage]
 
         let newerMessage = Message(role: .assistant, content: "Second")
         newerMessage.createdAt = Date()
-        conversation.messages.append(newerMessage)
+        conversation.messages?.append(newerMessage)
 
         #expect(conversation.lastMessage?.content == "Second")
     }
@@ -134,10 +134,10 @@ struct ConversationTests {
 
         #expect(conversation.messageCount == 0)
 
-        conversation.messages.append(Message(role: .user, content: "1"))
+        conversation.messages = [Message(role: .user, content: "1")]
         #expect(conversation.messageCount == 1)
 
-        conversation.messages.append(Message(role: .assistant, content: "2"))
+        conversation.messages?.append(Message(role: .assistant, content: "2"))
         #expect(conversation.messageCount == 2)
     }
 

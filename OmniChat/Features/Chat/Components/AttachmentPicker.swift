@@ -53,6 +53,10 @@ struct AttachmentPicker: View {
     /// Maximum file size in bytes (default: 20MB).
     var maxFileSize: Int = 20 * 1024 * 1024
 
+    // MARK: - Environment
+
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - State
 
     /// Selected photo item from PhotosPicker.
@@ -67,7 +71,21 @@ struct AttachmentPicker: View {
         HStack(spacing: Theme.Spacing.medium.rawValue) {
             // Image picker button
             PhotosPicker(selection: $selectedItem, matching: .images) {
-                pickerButton(icon: "photo", label: "Photo")
+                VStack(spacing: Theme.Spacing.tight.rawValue) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Theme.Colors.accent)
+                    Text("Photo")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.secondaryText.resolve(in: colorScheme))
+                }
+                .frame(width: 60, height: 60)
+                .background(Theme.Colors.tertiaryBackground.resolve(in: colorScheme))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue)
+                        .stroke(Theme.Colors.border.resolve(in: colorScheme), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
             .onChange(of: selectedItem) { _, item in
@@ -80,7 +98,21 @@ struct AttachmentPicker: View {
             Button {
                 showFileImporter = true
             } label: {
-                pickerButton(icon: "paperclip", label: "File")
+                VStack(spacing: Theme.Spacing.tight.rawValue) {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Theme.Colors.accent)
+                    Text("File")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.secondaryText.resolve(in: colorScheme))
+                }
+                .frame(width: 60, height: 60)
+                .background(Theme.Colors.tertiaryBackground.resolve(in: colorScheme))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue)
+                        .stroke(Theme.Colors.border.resolve(in: colorScheme), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
             .fileImporter(
@@ -91,28 +123,6 @@ struct AttachmentPicker: View {
                 handleFileImport(result)
             }
         }
-    }
-
-    // MARK: - Subviews
-
-    /// Creates a consistent picker button style.
-    private func pickerButton(icon: String, label: String) -> some View {
-        VStack(spacing: Theme.Spacing.tight.rawValue) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(Theme.Colors.accent)
-
-            Text(label)
-                .font(Theme.Typography.caption)
-                .foregroundStyle(Theme.Colors.secondaryText)
-        }
-        .frame(width: 60, height: 60)
-        .background(Theme.Colors.tertiaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue)
-                .stroke(Theme.Colors.border, lineWidth: 1)
-        )
     }
 
     // MARK: - Allowed Content Types
@@ -638,6 +648,10 @@ struct CompactAttachmentPicker: View {
     /// Maximum file size in bytes.
     var maxFileSize: Int = 20 * 1024 * 1024
 
+    // MARK: - Environment
+
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - State
 
     @State private var selectedItem: PhotosPickerItem?
@@ -651,7 +665,7 @@ struct CompactAttachmentPicker: View {
             PhotosPicker(selection: $selectedItem, matching: .images) {
                 Image(systemName: "photo")
                     .font(.system(size: 16))
-                    .foregroundStyle(Theme.Colors.tertiaryText)
+                    .foregroundStyle(Theme.Colors.tertiaryText.resolve(in: colorScheme))
             }
             .buttonStyle(.plain)
             .onChange(of: selectedItem) { _, item in
@@ -666,7 +680,7 @@ struct CompactAttachmentPicker: View {
             } label: {
                 Image(systemName: "paperclip")
                     .font(.system(size: 16))
-                    .foregroundStyle(Theme.Colors.tertiaryText)
+                    .foregroundStyle(Theme.Colors.tertiaryText.resolve(in: colorScheme))
             }
             .buttonStyle(.plain)
             .fileImporter(

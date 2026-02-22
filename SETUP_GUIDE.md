@@ -1,285 +1,429 @@
-# OmniChat — Claude Code Agent Setup Guide
+# OmniChat Development Setup Guide
+
+This guide covers everything you need to set up, build, test, and deploy OmniChat.
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Development Environment Setup](#development-environment-setup)
+3. [Building the Project](#building-the-project)
+4. [Running Tests](#running-tests)
+5. [Code Signing Setup](#code-signing-setup)
+6. [iCloud Configuration](#icloud-configuration)
+7. [Project Architecture](#project-architecture)
+8. [Common Troubleshooting](#common-troubleshooting)
+9. [Agent-Based Development](#agent-based-development)
+
+---
 
 ## Prerequisites
 
-1. **Claude Code** installed and authenticated (`claude` CLI available)
-2. **Xcode 16+** installed
-3. **Git** configured
-4. **Apple Developer account** (for iCloud entitlements and App Store)
+### Required
+
+- **macOS 14.0** (Sonoma) or later
+- **Xcode 16.0** or later
+- **Git** configured with your identity
+- **Apple Developer account** (for iCloud and App Store distribution)
+
+### Recommended
+
+- **Homebrew** for installing dependencies
+- **xcodegen** for project generation (`brew install xcodegen`)
 
 ---
 
-## Step 1: Initialize the Project
+## Development Environment Setup
+
+### Step 1: Clone the Repository
 
 ```bash
-mkdir -p ~/Projects/OmniChat
-cd ~/Projects/OmniChat
-git init
+git clone https://github.com/yourusername/OmniChat.git
+cd OmniChat
 ```
 
-## Step 2: Copy the Scaffold Files
-
-Copy all the scaffold files into your project root:
-
-```
-~/Projects/OmniChat/
-├── .claude/
-│   └── agents/
-│       ├── pm.md           ← Project Manager agent
-│       ├── core.md         ← Core/infrastructure agent
-│       ├── ui.md           ← UI/frontend agent
-│       ├── qa.md           ← QA/testing agent
-│       └── devops.md       ← DevOps/build agent
-├── CLAUDE.md               ← Project-level Claude Code config
-├── MASTER_PLAN.md          ← Full project specification
-├── AGENTS.md               ← Shared task board
-└── SETUP_GUIDE.md          ← This file
-```
-
-## Step 3: Verify Agents Are Registered
-
-Open Claude Code in the project directory:
+### Step 2: Install xcodegen
 
 ```bash
-cd ~/Projects/OmniChat
-claude
+brew install xcodegen
 ```
 
-Then run:
-```
-/agents
-```
+### Step 3: Generate Xcode Project
 
-You should see all 5 agents listed:
-- **pm** — Project Manager
-- **core** — Core infrastructure
-- **ui** — UI/frontend
-- **qa** — QA/testing
-- **devops** — DevOps/build
-
-## Step 4: Start Development
-
-### Option A: Single Session (Simplest)
-
-Run Claude Code and let it auto-delegate to agents:
+OmniChat uses [xcodegen](https://github.com/yonaskolb/XcodeGen) to manage the project configuration. This ensures reproducible builds and avoids merge conflicts in `.xcodeproj` files.
 
 ```bash
-cd ~/Projects/OmniChat
-claude
+xcodegen generate
 ```
 
-Then tell Claude:
-```
-Read MASTER_PLAN.md and AGENTS.md. Start with Phase 0 — use the devops agent 
-to set up the Xcode project, then proceed through each phase using the 
-appropriate agents. Use the pm agent to coordinate.
-```
+This reads `project.yml` and generates `OmniChat.xcodeproj`.
 
-Claude will automatically delegate tasks to the appropriate subagents based on their descriptions.
+### Step 4: Open in Xcode
 
-### Option B: Explicit Agent Invocation
-
-You can explicitly request specific agents:
-
-```
-> Use the pm agent to initialize AGENTS.md and assign Phase 0 tasks
-> Use the devops agent to create the Xcode project and configure capabilities
-> Use the core agent to implement the SwiftData models
-> Use the ui agent to build the ChatView
-> Use the qa agent to write tests for the provider adapters
-```
-
-### Option C: Parallel Sessions (Most Efficient)
-
-Open multiple Claude Code sessions in separate terminal tabs, each focused on a different agent:
-
-**Terminal 1 — PM:**
 ```bash
-cd ~/Projects/OmniChat
-claude
-> Use the pm agent to manage the project. Read MASTER_PLAN.md and coordinate work.
+open OmniChat.xcodeproj
 ```
 
-**Terminal 2 — Core:**
+### Step 5: Verify Build
+
+Build for both platforms to verify everything is working:
+
 ```bash
-cd ~/Projects/OmniChat
-claude
-> Use the core agent. Check AGENTS.md for assigned tasks and start implementing.
-```
+# iOS Simulator
+xcodebuild -scheme OmniChat -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
-**Terminal 3 — UI:**
-```bash
-cd ~/Projects/OmniChat
-claude
-> Use the ui agent. Check AGENTS.md for assigned tasks and start implementing.
-```
-
-**Terminal 4 — QA:**
-```bash
-cd ~/Projects/OmniChat
-claude
-> Use the qa agent. Monitor AGENTS.md for completed modules and write tests.
-```
-
-**Important for parallel sessions:**
-- Each session operates on the same Git repo
-- Agents coordinate via `AGENTS.md` — always pull/read it before starting work
-- Agents commit with prefixes: `[pm]`, `[core]`, `[ui]`, `[qa]`, `[devops]`
-- Keep an eye on merge conflicts — resolve them promptly
-
----
-
-## How Agent Coordination Works
-
-### Task Board (AGENTS.md)
-This is the single source of truth for task assignments:
-
-```markdown
-| Task ID | Description | Agent | Status | Blockers | Notes |
-|---------|-------------|-------|--------|----------|-------|
-| TASK-1.1 | SwiftData Models | core | IN PROGRESS | — | — |
-| TASK-2.1 | ContentView | ui | BLOCKED | TASK-1.1 | Needs data models |
-```
-
-### Workflow
-1. **PM agent** reads MASTER_PLAN.md, populates AGENTS.md with phase tasks
-2. **Each agent** checks AGENTS.md, claims their tasks, marks "IN PROGRESS"
-3. **On completion**, agent commits code and marks task "DONE" in AGENTS.md
-4. **If blocked**, agent updates AGENTS.md with blocker and moves to next task
-5. **PM agent** monitors progress, resolves blockers, gates phase transitions
-
-### File Ownership
-Each agent has exclusive ownership of specific directories (defined in their agent files). This prevents conflicts:
-
-| Agent | Owns |
-|-------|------|
-| core | `Core/`, `Shared/Models/`, `Shared/Extensions/` |
-| ui | `App/`, `Features/`, `Shared/DesignSystem/`, `Resources/` |
-| qa | `OmniChatTests/`, `OmniChatUITests/` |
-| devops | `.xcodeproj`, `Info.plist`, `.entitlements`, `scripts/` |
-| pm | `AGENTS.md`, `README.md`, docs only |
-
----
-
-## Phase Progression
-
-The project follows 12 phases (Phase 0–11). See MASTER_PLAN.md for full details.
-
-**Quick reference:**
-1. **Phase 0**: Project setup (devops leads)
-2. **Phase 1**: Core data & provider layer (core leads)
-3. **Phase 2**: Chat UI foundation (ui leads)
-4. **Phase 3**: Provider configuration UI (ui leads, core supports)
-5. **Phase 4**: Advanced chat features (ui leads)
-6. **Phase 5**: Personas & system prompts (ui + core)
-7. **Phase 6**: iCloud sync & polish (all agents)
-8. **Phase 7**: Ollama & custom providers (core leads)
-9. **Phase 8**: Token tracking & usage dashboard (core + ui)
-10. **Phase 9**: OAuth integration (core leads)
-11. **Phase 10**: Polish, testing & App Store (all agents)
-12. **Phase 11**: Ads integration (devops + ui) — LAST STEP
-
----
-
-## Agent Teams vs Subagents — Two Modes of Operation
-
-This scaffold supports **both** Claude Code coordination models. Understanding the difference is key:
-
-### Subagents (`.claude/agents/*.md`)
-- Run **within a single Claude Code session**
-- The main session delegates to a subagent → subagent works → returns results to main session
-- Subagents **cannot talk to each other** — only report back to the parent
-- Each subagent gets its own context window (doesn't pollute main conversation)
-- Great for: focused tasks, sequential workflows, single-developer use
-
-**How to use:** Just tell Claude which agent to invoke:
-```
-> Use the core agent to implement the SSE parser
-```
-
-### Agent Teams (experimental, enabled via settings.json)
-- Multiple **independent Claude Code instances** running simultaneously
-- A team lead coordinates, spawns teammates, assigns tasks
-- Teammates **can message each other directly** — no round-trip through lead
-- Shared task list with status tracking
-- Great for: parallel development, large features, cross-layer work
-
-**How to use:** The feature is already enabled in `.claude/settings.json`. Tell Claude to create a team:
-```
-> Create an agent team for OmniChat Phase 1. Spawn teammates:
-> - "core-models" working on SwiftData models (use the core agent instructions)
-> - "core-network" working on networking and SSE parser (use the core agent instructions)  
-> - "core-providers" working on Anthropic and OpenAI adapters (use the core agent instructions)
-> Have them coordinate: core-providers depends on core-network finishing the SSE parser.
-```
-
-### Which to Use When
-
-| Scenario | Use | Why |
-|----------|-----|-----|
-| Quick focused task | Subagent | Low overhead, fast |
-| Sequential phase work | Subagent | Tasks have dependencies |
-| Parallel independent modules | Agent Team | Real parallelism, direct coordination |
-| Cross-layer feature (UI + Core) | Agent Team | Frontend/backend teammates message each other |
-| Code review from multiple angles | Agent Team | Security + performance + tests in parallel |
-| Single terminal, casual work | Subagent | Simpler setup |
-
-### Agent Teams Configuration
-
-The scaffold includes `.claude/settings.json` with Agent Teams enabled:
-```json
-{
-  "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": true
-}
-```
-
-Alternatively, set the environment variable:
-```bash
-export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-```
-
-**Display modes** (for tmux users):
-- **auto** (default): Split panes if in tmux, in-process otherwise
-- **split panes**: Each teammate gets its own tmux pane — best for 3+ teammates
-- **in-process**: All in one terminal, use Shift+Up/Down to switch views
-
-**Recommended setup for OmniChat development:**
-```bash
-# Start a tmux session for split pane view
-tmux new -s omnichat
-cd ~/Projects/OmniChat
-claude
-```
-
-Then instruct Claude to create a team based on the current phase. The subagent definitions in `.claude/agents/` serve double duty — their system prompts and ownership rules apply whether invoked as subagents or as teammates in an Agent Team.
-
-### Example: Full Phase 1 with Agent Teams
-
-```
-Read MASTER_PLAN.md and AGENTS.md. Create an agent team called "phase-1" for Phase 1 work.
-
-Spawn these teammates:
-1. "data-layer" — Implement SwiftData models and DataManager (TASK-1.1, TASK-1.4). 
-   Follow the core agent rules from .claude/agents/core.md.
-2. "networking" — Implement HTTPClient, SSEParser (TASK-1.5, TASK-1.4).
-   Follow the core agent rules from .claude/agents/core.md.
-3. "anthropic" — Implement AnthropicAdapter (TASK-1.6). Depends on networking finishing SSEParser.
-   Follow the core agent rules from .claude/agents/core.md.
-4. "openai" — Implement OpenAIAdapter (TASK-1.7). Depends on networking finishing SSEParser.
-   Follow the core agent rules from .claude/agents/core.md.
-
-Use Sonnet for all teammates. Coordinate dependencies: anthropic and openai should wait 
-for networking to finish the SSE parser before starting their streaming implementation.
-Update AGENTS.md as tasks complete.
+# macOS
+xcodebuild -scheme OmniChat -destination 'platform=macOS' build
 ```
 
 ---
 
-## Tips
+## Building the Project
 
-- **Always have agents read MASTER_PLAN.md first** — it's the project bible
-- **Use the PM agent** when things get complex or agents need coordination
-- **Run builds frequently**: `xcodebuild -scheme OmniChat -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build`
-- **QA agent should test early** — don't wait for the entire phase
-- **Git commit often** with the proper prefix so you can track which agent did what
-- For **complex provider work** (streaming, SSE parsing), give the core agent MASTER_PLAN.md Appendix A as reference — it has exact API formats
+### Available Schemes
+
+| Scheme | Description |
+|--------|-------------|
+| `OmniChat` | Main app (iOS + macOS) |
+| `OmniChatTests` | Unit tests |
+| `OmniChatUITests` | UI automation tests |
+
+### Build Commands
+
+```bash
+# Build for iOS Simulator
+xcodebuild -scheme OmniChat \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  build
+
+# Build for macOS
+xcodebuild -scheme OmniChat \
+  -destination 'platform=macOS' \
+  build
+
+# Clean build
+xcodebuild -scheme OmniChat \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  clean build
+
+# Quick build check (show last 20 lines of output)
+xcodebuild -scheme OmniChat \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  build 2>&1 | tail -20
+```
+
+### Build Configuration
+
+- **Debug**: Development builds with full debugging symbols
+- **Release**: Optimized builds for distribution
+
+```bash
+# Release build
+xcodebuild -scheme OmniChat \
+  -destination 'platform=macOS' \
+  -configuration Release \
+  build
+```
+
+---
+
+## Running Tests
+
+### Unit Tests
+
+```bash
+# Run all unit tests on iOS Simulator
+xcodebuild test -scheme OmniChatTests \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+
+# Run all unit tests on macOS
+xcodebuild test -scheme OmniChatTests \
+  -destination 'platform=macOS'
+
+# Run specific test target
+xcodebuild test -scheme OmniChatTests \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  -only-testing:OmniChatTests/SSEParserTests
+```
+
+### UI Tests
+
+```bash
+xcodebuild test -scheme OmniChatUITests \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+```
+
+### Code Coverage
+
+The OmniChatTests scheme is configured to gather coverage data. After running tests, view coverage in Xcode's Report Navigator.
+
+---
+
+## Code Signing Setup
+
+### Development Signing
+
+1. Open `project.yml`
+2. Update the bundle ID prefix:
+   ```yaml
+   options:
+     bundleIdPrefix: com.yourname  # Change to your identifier
+   ```
+3. Regenerate the project:
+   ```bash
+   xcodegen generate
+   ```
+4. In Xcode, select your development team:
+   - Select the OmniChat target
+   - Go to **Signing & Capabilities**
+   - Choose your team from the dropdown
+
+### App Store Distribution
+
+1. Create App ID in [Apple Developer Portal](https://developer.apple.com/account):
+   - Identifier: `com.yourname.omnichat`
+   - Capabilities: iCloud, Keychain Sharing
+
+2. Create provisioning profile:
+   - Type: App Store
+   - App ID: Your OmniChat App ID
+   - Certificates: Your distribution certificate
+
+3. Archive for distribution:
+   ```bash
+   xcodebuild -scheme OmniChat \
+     -destination 'generic/platform=iOS' \
+     -archivePath build/OmniChat.xcarchive \
+     archive
+   ```
+
+4. Export IPA:
+   ```bash
+   xcodebuild -exportArchive \
+     -archivePath build/OmniChat.xcarchive \
+     -exportPath build/export \
+     -exportOptionsPlist ExportOptions.plist
+   ```
+
+---
+
+## iCloud Configuration
+
+### Prerequisites
+
+- Paid Apple Developer account
+- App ID with iCloud capability enabled
+
+### Setup Steps
+
+1. **Enable iCloud in Apple Developer Portal**:
+   - Go to [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers)
+   - Select your App ID
+   - Enable **iCloud** capability
+   - Create a CloudKit container: `iCloud.com.yourname.omnichat`
+
+2. **Update project.yml**:
+   ```yaml
+   entitlements:
+     properties:
+       com.apple.developer.icloud-container-identifiers:
+         - iCloud.com.yourname.omnichat  # Your container ID
+   ```
+
+3. **Regenerate project**:
+   ```bash
+   xcodegen generate
+   ```
+
+4. **Configure CloudKit in Xcode**:
+   - Select the OmniChat target
+   - Go to **Signing & Capabilities**
+   - Click **+ Capability** and add **iCloud**
+   - Check **CloudKit**
+   - Select your container
+
+### Testing iCloud Sync
+
+1. Run app on two devices (physical devices, not simulators)
+2. Sign in with the same Apple ID on both
+3. Create a conversation on one device
+4. Wait 30-60 seconds for sync
+5. Verify conversation appears on the other device
+
+**Note**: CloudKit does not work reliably in simulators. Always test sync on real devices.
+
+---
+
+## Project Architecture
+
+### Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| UI | SwiftUI with `@Observable` |
+| State Management | Observation framework |
+| Data Persistence | SwiftData |
+| Cloud Sync | CloudKit (via SwiftData) |
+| Secrets | Keychain |
+| Networking | URLSession + AsyncThrowingStream |
+| Markdown | swift-markdown |
+| Auth | ASWebAuthenticationSession |
+
+### Directory Structure
+
+```
+OmniChat/
+  App/
+    OmniChatApp.swift      # @main entry point
+    AppState.swift         # Global app state
+    ContentView.swift      # Root NavigationSplitView
+  Features/
+    Chat/
+      Views/               # ChatView, MessageBubble, etc.
+      ViewModels/          # ChatViewModel
+      Components/          # Reusable UI components
+    ConversationList/
+      Views/               # ConversationListView, ConversationRow
+    Settings/
+      Views/               # SettingsView, ProviderListView
+      ViewModels/          # Settings logic
+    Personas/
+      Views/               # Persona editor and picker
+  Core/
+    Provider/
+      ProviderProtocol.swift    # AIProvider protocol
+      ProviderManager.swift     # Provider registry
+      Adapters/                 # Anthropic, OpenAI, Ollama, Custom
+    Data/
+      DataManager.swift         # SwiftData container
+      Models/                   # SwiftData @Model classes
+      CostCalculator.swift      # Usage cost calculation
+    Keychain/
+      KeychainManager.swift     # Secure credential storage
+    Auth/
+      OAuthManager.swift        # OAuth flow handling
+      PKCE.swift                # PKCE implementation
+    Networking/
+      HTTPClient.swift          # URLSession wrapper
+      SSEParser.swift           # Server-Sent Events parser
+    Markdown/
+      MarkdownParser.swift      # swift-markdown integration
+      SyntaxHighlighter.swift   # Code block highlighting
+  Shared/
+    DesignSystem/
+      Theme.swift               # Colors, typography, spacing
+      DenseLayout.swift         # Raycast-style spacing
+      KeyboardShortcuts.swift   # Keyboard shortcut registry
+    Extensions/
+      String+Extensions.swift
+      Date+Extensions.swift
+      View+Extensions.swift
+    Constants.swift
+```
+
+### Key Patterns
+
+- **@Observable**: Use the Observation framework, NOT `ObservableObject`
+- **Swift 6 Concurrency**: All cross-boundary types must be `Sendable`
+- **Protocol-based adapters**: All AI providers conform to `AIProvider` protocol
+- **Keychain for secrets**: API keys never stored in SwiftData
+
+---
+
+## Common Troubleshooting
+
+### Build Errors
+
+**"No such module 'Markdown'"**
+```bash
+# Resolve Swift packages
+xcodebuild -resolvePackageDependencies
+```
+
+**"Failed to create provisioning profile"**
+- Ensure your Apple ID is added in Xcode > Preferences > Accounts
+- Select a development team in Signing & Capabilities
+
+**"xcodegen: command not found"**
+```bash
+brew install xcodegen
+```
+
+### Runtime Issues
+
+**"Keychain access failed"**
+- Keychain operations may fail in simulator
+- Test on physical devices for Keychain functionality
+
+**"CloudKit sync not working"**
+- Ensure iCloud is enabled in Signing & Capabilities
+- Verify the container identifier matches your CloudKit container
+- Test on physical devices (simulator CloudKit is unreliable)
+
+**"Streaming stops mid-response"**
+- Check network connectivity
+- Verify API key is valid
+- Check provider API status
+
+### Regenerating the Project
+
+If you encounter project file issues:
+
+```bash
+# Remove generated project
+rm -rf OmniChat.xcodeproj
+
+# Regenerate
+xcodegen generate
+```
+
+---
+
+## Agent-Based Development
+
+OmniChat was built using a multi-agent development workflow with Claude Code. The project includes agent definitions for specialized tasks.
+
+### Available Agents
+
+| Agent | Purpose | Owns |
+|-------|---------|------|
+| `pm` | Project management, coordination | AGENTS.md, docs |
+| `core` | Infrastructure, providers, data | Core/, Shared/Models/ |
+| `ui` | SwiftUI views, design system | Features/, App/, DesignSystem/ |
+| `qa` | Testing, build verification | OmniChatTests/, OmniChatUITests/ |
+| `devops` | Xcode config, deployment | project.yml, entitlements |
+
+### Using Agents
+
+If you have Claude Code installed, you can invoke agents for specific tasks:
+
+```
+> Use the core agent to implement a new provider adapter
+> Use the ui agent to add a new settings view
+> Use the qa agent to write tests for the markdown parser
+```
+
+### Task Coordination
+
+Agents coordinate via `AGENTS.md`, which tracks:
+- Current phase and task status
+- Blockers and dependencies
+- Architectural decisions
+- Integration notes
+
+---
+
+## Additional Resources
+
+- [MASTER_PLAN.md](MASTER_PLAN.md) - Complete project specification
+- [CLAUDE.md](CLAUDE.md) - Project-level configuration for Claude Code
+- [AGENTS.md](AGENTS.md) - Task board and coordination
+
+## Getting Help
+
+1. Check the [Troubleshooting](#common-troubleshooting) section
+2. Review [MASTER_PLAN.md](MASTER_PLAN.md) for architecture decisions
+3. Open an issue on GitHub with:
+   - Xcode version
+   - macOS version
+   - Full error message
+   - Steps to reproduce

@@ -33,15 +33,15 @@ import os
 /// - Indexed by providerConfigID, conversationID, modelID for efficient queries
 @Model
 final class UsageRecord {
-    var id: UUID
-    var providerConfigID: UUID
-    var modelID: String
-    var conversationID: UUID
-    var messageID: UUID
-    var inputTokens: Int
-    var outputTokens: Int
-    var costUSD: Double
-    var timestamp: Date
+    var id: UUID = UUID()
+    var providerConfigID: UUID = UUID()
+    var modelID: String = ""
+    var conversationID: UUID = UUID()
+    var messageID: UUID = UUID()
+    var inputTokens: Int = 0
+    var outputTokens: Int = 0
+    var costUSD: Double = 0.0
+    var timestamp: Date = Date()
 
     // MARK: - Computed Properties
 

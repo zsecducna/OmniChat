@@ -26,7 +26,7 @@ struct MessageTests {
         #expect(message.outputTokens == nil)
         #expect(message.durationMs == nil)
         #expect(message.conversation == nil)
-        #expect(message.attachments.isEmpty)
+        #expect((message.attachments ?? []).isEmpty)
     }
 
     @Test("Message initializes with all custom values")
@@ -75,10 +75,10 @@ struct MessageTests {
             mimeType: "image/png",
             data: Data()
         )
-        message.attachments.append(attachment)
+        message.attachments = [attachment]
 
-        #expect(message.attachments.count == 1)
-        #expect(message.attachments.first?.fileName == "image.png")
+        #expect((message.attachments ?? []).count == 1)
+        #expect(message.attachments?.first?.fileName == "image.png")
     }
 
     @Test("Message attachments cascade delete")
@@ -88,11 +88,11 @@ struct MessageTests {
         let message = Message(role: .user, content: "Test")
         let attachment = Attachment(fileName: "test.txt", mimeType: "text/plain", data: Data())
 
-        message.attachments.append(attachment)
+        message.attachments = [attachment]
         attachment.message = message
 
         #expect(attachment.message === message)
-        #expect(message.attachments.first === attachment)
+        #expect(message.attachments?.first === attachment)
     }
 
     // MARK: - Conversation Relationship Tests
