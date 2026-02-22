@@ -181,6 +181,12 @@ final class ProviderManager {
             adapter = try ZhipuAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created Zhipu adapter for '\(config.name)'")
 
+        // OpenAI-compatible providers - use OpenAIAdapter with custom baseURL
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            adapter = try OpenAIAdapter(config: snapshot, apiKey: apiKey)
+            Self.logger.debug("Created \(config.providerType.displayName) adapter (OpenAI-compatible) for '\(config.name)'")
+
         case .custom:
             adapter = CustomAdapter(config: snapshot, apiKey: apiKey.isEmpty ? nil : apiKey)
             Self.logger.debug("Created Custom adapter for '\(config.name)'")

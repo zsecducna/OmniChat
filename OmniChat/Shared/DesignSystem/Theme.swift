@@ -162,6 +162,39 @@ enum Theme {
         /// Z.AI/ZhipuAI accent color (teal)
         static let zhipuAccent = Color(hex: "00BFA5")
 
+        /// Groq accent color (purple-pink)
+        static let groqAccent = Color(hex: "F55036")
+
+        /// Cerebras accent color (red-orange)
+        static let cerebrasAccent = Color(hex: "FF6B35")
+
+        /// Mistral AI accent color (orange)
+        static let mistralAccent = Color(hex: "FF7000")
+
+        /// DeepSeek accent color (blue)
+        static let deepSeekAccent = Color(hex: "4285F4")
+
+        /// Together AI accent color (purple)
+        static let togetherAccent = Color(hex: "7C3AED")
+
+        /// Fireworks AI accent color (orange-red)
+        static let fireworksAccent = Color(hex: "EF4444")
+
+        /// OpenRouter accent color (blue-purple)
+        static let openRouterAccent = Color(hex: "6366F1")
+
+        /// SiliconFlow accent color (cyan)
+        static let siliconFlowAccent = Color(hex: "06B6D4")
+
+        /// xAI/Grok accent color (dark gray)
+        static let xAIAccent = Color(hex: "1A1A1A")
+
+        /// Perplexity accent color (teal-blue)
+        static let perplexityAccent = Color(hex: "20B2AA")
+
+        /// Google AI accent color (Google blue)
+        static let googleAccent = Color(hex: "4285F4")
+
         /// Custom provider accent color (purple)
         static let customAccent = Color(hex: "8B5CF6")
 
@@ -220,6 +253,28 @@ enum Theme {
                 return ollamaAccent
             case "zhipu", "z.ai", "zhipuai", "glm":
                 return zhipuAccent
+            case "groq":
+                return groqAccent
+            case "cerebras":
+                return cerebrasAccent
+            case "mistral", "mistralai":
+                return mistralAccent
+            case "deepseek":
+                return deepSeekAccent
+            case "together", "togetherai":
+                return togetherAccent
+            case "fireworks", "fireworksai":
+                return fireworksAccent
+            case "openrouter":
+                return openRouterAccent
+            case "siliconflow":
+                return siliconFlowAccent
+            case "xai", "grok":
+                return xAIAccent
+            case "perplexity":
+                return perplexityAccent
+            case "google", "gemini":
+                return googleAccent
             default:
                 return customAccent
             }

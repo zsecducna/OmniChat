@@ -14,6 +14,18 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
     case openai
     case ollama
     case zhipu
+    // OpenAI-compatible providers
+    case groq
+    case cerebras
+    case mistral
+    case deepSeek
+    case together
+    case fireworks
+    case openRouter
+    case siliconFlow
+    case xAI
+    case perplexity
+    case google
     case custom
 
     /// Returns the default base URL for this provider type.
@@ -27,6 +39,29 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "http://localhost:11434"
         case .zhipu:
             return "https://api.z.ai/api/paas/v4"
+        // OpenAI-compatible providers
+        case .groq:
+            return "https://api.groq.com/openai"
+        case .cerebras:
+            return "https://api.cerebras.ai/v1"
+        case .mistral:
+            return "https://api.mistral.ai/v1"
+        case .deepSeek:
+            return "https://api.deepseek.com"
+        case .together:
+            return "https://api.together.xyz/v1"
+        case .fireworks:
+            return "https://api.fireworks.ai/inference/v1"
+        case .openRouter:
+            return "https://openrouter.ai/api/v1"
+        case .siliconFlow:
+            return "https://api.siliconflow.cn/v1"
+        case .xAI:
+            return "https://api.x.ai/v1"
+        case .perplexity:
+            return "https://api.perplexity.ai"
+        case .google:
+            return "https://generativelanguage.googleapis.com/v1beta"
         case .custom:
             return nil
         }
@@ -43,8 +78,42 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "Ollama"
         case .zhipu:
             return "Z.AI"
+        // OpenAI-compatible providers
+        case .groq:
+            return "Groq"
+        case .cerebras:
+            return "Cerebras"
+        case .mistral:
+            return "Mistral AI"
+        case .deepSeek:
+            return "DeepSeek"
+        case .together:
+            return "Together AI"
+        case .fireworks:
+            return "Fireworks AI"
+        case .openRouter:
+            return "OpenRouter"
+        case .siliconFlow:
+            return "SiliconFlow"
+        case .xAI:
+            return "xAI (Grok)"
+        case .perplexity:
+            return "Perplexity"
+        case .google:
+            return "Google AI"
         case .custom:
             return "Custom"
+        }
+    }
+
+    /// Returns whether this provider uses OpenAI-compatible API format.
+    var isOpenAICompatible: Bool {
+        switch self {
+        case .anthropic, .ollama, .zhipu, .custom:
+            return false
+        case .openai, .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            return true
         }
     }
 }

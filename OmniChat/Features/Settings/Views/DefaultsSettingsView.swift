@@ -193,6 +193,28 @@ struct DefaultsSettingsView: View {
             return Theme.Colors.ollamaAccent
         case .zhipu:
             return Theme.Colors.zhipuAccent
+        case .groq:
+            return Theme.Colors.groqAccent
+        case .cerebras:
+            return Theme.Colors.cerebrasAccent
+        case .mistral:
+            return Theme.Colors.mistralAccent
+        case .deepSeek:
+            return Theme.Colors.deepSeekAccent
+        case .together:
+            return Theme.Colors.togetherAccent
+        case .fireworks:
+            return Theme.Colors.fireworksAccent
+        case .openRouter:
+            return Theme.Colors.openRouterAccent
+        case .siliconFlow:
+            return Theme.Colors.siliconFlowAccent
+        case .xAI:
+            return Theme.Colors.xAIAccent
+        case .perplexity:
+            return Theme.Colors.perplexityAccent
+        case .google:
+            return Theme.Colors.googleAccent
         case .custom:
             return Theme.Colors.customAccent
         }

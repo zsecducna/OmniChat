@@ -460,6 +460,17 @@ struct ChatView: View {
         case .openai: return "cpu"
         case .ollama: return "terminal"
         case .zhipu: return "sparkles"
+        case .groq: return "bolt"
+        case .cerebras: return "flame"
+        case .mistral: return "wind"
+        case .deepSeek: return "waveform.path"
+        case .together: return "person.3"
+        case .fireworks: return "sparkles"
+        case .openRouter: return "arrow.triangle.branch"
+        case .siliconFlow: return "memorychip"
+        case .xAI: return "x.square"
+        case .perplexity: return "magnifyingglass"
+        case .google: return "g.circle"
         case .custom: return "gearshape.2"
         }
     }
@@ -470,6 +481,17 @@ struct ChatView: View {
         case .openai: return Theme.Colors.openaiAccent
         case .ollama: return Theme.Colors.ollamaAccent
         case .zhipu: return Theme.Colors.zhipuAccent
+        case .groq: return Theme.Colors.groqAccent
+        case .cerebras: return Theme.Colors.cerebrasAccent
+        case .mistral: return Theme.Colors.mistralAccent
+        case .deepSeek: return Theme.Colors.deepSeekAccent
+        case .together: return Theme.Colors.togetherAccent
+        case .fireworks: return Theme.Colors.fireworksAccent
+        case .openRouter: return Theme.Colors.openRouterAccent
+        case .siliconFlow: return Theme.Colors.siliconFlowAccent
+        case .xAI: return Theme.Colors.xAIAccent
+        case .perplexity: return Theme.Colors.perplexityAccent
+        case .google: return Theme.Colors.googleAccent
         case .custom: return Theme.Colors.customAccent
         }
     }

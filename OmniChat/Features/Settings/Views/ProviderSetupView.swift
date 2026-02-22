@@ -358,6 +358,11 @@ struct ProviderSetupView: View {
             case .ollama:
                 ollamaConfigurationSection
 
+            // OpenAI-compatible providers - use same auth flow as OpenAI
+            case .groq, .cerebras, .mistral, .deepSeek, .together,
+                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+                openAICompatibleAuthSection
+
             case .custom:
                 switch selectedAuthMethod {
                 case .apiKey:
@@ -591,7 +596,8 @@ struct ProviderSetupView: View {
         case .custom:
             // Custom providers need user-provided config
             return !oauthClientID.isEmpty && !oauthAuthURL.isEmpty && !oauthTokenURL.isEmpty
-        case .ollama:
+        case .ollama, .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             return false
         }
     }
@@ -943,6 +949,76 @@ struct ProviderSetupView: View {
 
     // MARK: - Ollama Configuration Section
 
+    // MARK: - OpenAI-Compatible Auth Section
+
+    /// Authentication section for OpenAI-compatible providers (Groq, Cerebras, Mistral, etc.)
+    @ViewBuilder
+    private var openAICompatibleAuthSection: some View {
+        Section {
+            TextField("Base URL", text: $baseURL)
+                .textContentType(.URL)
+                #if os(iOS)
+                .keyboardType(.URL)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("API Endpoint")
+        } footer: {
+            Text("Default: \(providerType.defaultBaseURL ?? "Custom URL")")
+        }
+
+        Section {
+            SecureField("API Key", text: $apiKey)
+                .textContentType(.password)
+                #if os(iOS)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("API Key")
+        } footer: {
+            Text("Your API key is stored securely in Keychain")
+        }
+
+        Section {
+            Button {
+                validateCredentials()
+            } label: {
+                HStack {
+                    Text("Validate")
+                        .font(Theme.Typography.body)
+                    Spacer()
+                    if isValidating {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            .disabled(apiKey.isEmpty || isValidating)
+
+            if let error = validationError {
+                Label(error, systemImage: "xmark.circle")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.destructive)
+            }
+
+            if isValidated {
+                Label("Validated successfully", systemImage: "checkmark.circle")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.success)
+            }
+        } header: {
+            Text("Validation")
+        } footer: {
+            if !isValidated {
+                Text("Validate your credentials before proceeding")
+            }
+        }
+    }
+
+    // MARK: - Ollama Configuration Section
+
     @ViewBuilder
     private var ollamaConfigurationSection: some View {
         Section {
@@ -1180,6 +1256,10 @@ struct ProviderSetupView: View {
         case .ollama:
             // For Ollama, we just need a non-empty base URL or accept the default
             return true
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            // OpenAI-compatible providers need API key validation
+            return isValidated
         case .custom:
             // For custom, we need a base URL
             guard !baseURL.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
@@ -1203,6 +1283,10 @@ struct ProviderSetupView: View {
             return false
         case .ollama:
             return false
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            // OpenAI-compatible providers typically use API keys
+            return false
         }
     }
 
@@ -1213,6 +1297,10 @@ struct ProviderSetupView: View {
             return [.apiKey]
         case .ollama:
             return [.none]
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            // OpenAI-compatible providers use API keys
+            return [.apiKey]
         case .custom:
             return [.apiKey, .oauth, .none]
         }
@@ -1464,7 +1552,9 @@ struct ProviderSetupView: View {
         case .apiKey:
             // Load API key from Keychain
             switch providerType {
-            case .anthropic, .openai, .zhipu, .custom:
+            case .anthropic, .openai, .zhipu, .custom,
+                 .groq, .cerebras, .mistral, .deepSeek, .together,
+                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                 if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
                     apiKey = key
                     isValidated = true
@@ -1744,6 +1834,29 @@ struct ProviderSetupView: View {
                         }
                     }
 
+                case .groq, .cerebras, .mistral, .deepSeek, .together,
+                     .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+                    // OpenAI-compatible providers - try to fetch models
+                    logger.debug("Fetching models from \(self.providerType.rawValue) (OpenAI-compatible)")
+                    if let models = try? await fetchCustomProviderModels(config: tempConfig), !models.isEmpty {
+                        logger.debug("Fetched \(models.count) models from provider")
+                        await MainActor.run {
+                            isFetchingModels = false
+                            modelFetchError = nil
+                            availableModels = models.sorted { $0.displayName < $1.displayName }
+                            if selectedModelID == nil {
+                                selectedModelID = models.first?.id
+                            }
+                        }
+                    } else {
+                        logger.debug("Provider fetch failed, using defaults")
+                        await MainActor.run {
+                            isFetchingModels = false
+                            modelFetchError = "Could not fetch models from provider. Using defaults."
+                            loadDefaultModels()
+                        }
+                    }
+
                 case .ollama:
                     // Fetch from Ollama directly
                     logger.debug("Fetching models from Ollama server")
@@ -1903,6 +2016,9 @@ struct ProviderSetupView: View {
             authMethod = selectedAuthMethod == .oauth ? .oauth : .apiKey
         case .ollama:
             authMethod = .none
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            authMethod = .apiKey
         case .custom:
             authMethod = selectedAuthMethod
         }
@@ -2078,6 +2194,10 @@ struct ProviderSetupView: View {
             return try OpenAIAdapter(config: config, apiKey: apiKey)
         case .zhipu:
             return try ZhipuAdapter(config: config, apiKey: apiKey)
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+            // OpenAI-compatible providers use OpenAIAdapter
+            return try OpenAIAdapter(config: config, apiKey: apiKey)
         case .ollama, .custom:
             throw ProviderError.notSupported("Provider type not yet supported for validation")
         }
@@ -2117,6 +2237,81 @@ struct ProviderSetupView: View {
                 ModelInfo(id: "glm-5", displayName: "GLM-5", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
                 ModelInfo(id: "glm-4.7", displayName: "GLM-4.7", contextWindow: 128000, supportsVision: true, supportsStreaming: true)
             ]
+        case .groq:
+            // Groq - fast inference
+            return [
+                ModelInfo(id: "llama-3.3-70b-versatile", displayName: "Llama 3.3 70B Versatile", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llama-3.1-8b-instant", displayName: "Llama 3.1 8B Instant", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llama-3.2-90b-vision-preview", displayName: "Llama 3.2 90B Vision", contextWindow: 8192, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "mixtral-8x7b-32768", displayName: "Mixtral 8x7B", contextWindow: 32768, supportsVision: false, supportsStreaming: true)
+            ]
+        case .cerebras:
+            // Cerebras - ultra-fast inference
+            return [
+                ModelInfo(id: "llama-3.3-70b", displayName: "Llama 3.3 70B", contextWindow: 8192, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llama-3.1-8b", displayName: "Llama 3.1 8B", contextWindow: 8192, supportsVision: false, supportsStreaming: true)
+            ]
+        case .mistral:
+            // Mistral AI
+            return [
+                ModelInfo(id: "mistral-large-latest", displayName: "Mistral Large", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "mistral-small-latest", displayName: "Mistral Small", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "codestral-latest", displayName: "Codestral", contextWindow: 256000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "pixtral-large-latest", displayName: "Pixtral Large (Vision)", contextWindow: 128000, supportsVision: true, supportsStreaming: true)
+            ]
+        case .deepSeek:
+            // DeepSeek
+            return [
+                ModelInfo(id: "deepseek-chat", displayName: "DeepSeek Chat", contextWindow: 64000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "deepseek-reasoner", displayName: "DeepSeek Reasoner", contextWindow: 64000, supportsVision: false, supportsStreaming: true)
+            ]
+        case .together:
+            // Together AI
+            return [
+                ModelInfo(id: "meta-llama/Llama-3.3-70B-Instruct-Turbo", displayName: "Llama 3.3 70B Turbo", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo", displayName: "Llama 3.2 90B Vision", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "mistralai/Mixtral-8x7B-Instruct-v0.1", displayName: "Mixtral 8x7B", contextWindow: 32768, supportsVision: false, supportsStreaming: true)
+            ]
+        case .fireworks:
+            // Fireworks AI
+            return [
+                ModelInfo(id: "accounts/fireworks/models/llama-v3p3-70b-instruct", displayName: "Llama 3.3 70B", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "accounts/fireworks/models/qwen2p5-72b-instruct", displayName: "Qwen 2.5 72B", contextWindow: 32768, supportsVision: false, supportsStreaming: true)
+            ]
+        case .openRouter:
+            // OpenRouter - gateway to many models
+            return [
+                ModelInfo(id: "anthropic/claude-sonnet-4", displayName: "Claude Sonnet 4 (via OpenRouter)", contextWindow: 200000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "openai/gpt-4o", displayName: "GPT-4o (via OpenRouter)", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "meta-llama/llama-3.3-70b-instruct", displayName: "Llama 3.3 70B (via OpenRouter)", contextWindow: 128000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "google/gemini-pro-1.5", displayName: "Gemini Pro 1.5 (via OpenRouter)", contextWindow: 1000000, supportsVision: true, supportsStreaming: true)
+            ]
+        case .siliconFlow:
+            // SiliconFlow (China)
+            return [
+                ModelInfo(id: "deepseek-ai/DeepSeek-V3", displayName: "DeepSeek V3", contextWindow: 64000, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "Qwen/Qwen2.5-72B-Instruct", displayName: "Qwen 2.5 72B", contextWindow: 32768, supportsVision: false, supportsStreaming: true)
+            ]
+        case .xAI:
+            // xAI (Grok)
+            return [
+                ModelInfo(id: "grok-beta", displayName: "Grok Beta", contextWindow: 131072, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "grok-2-1212", displayName: "Grok 2", contextWindow: 131072, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "grok-2-vision-1212", displayName: "Grok 2 Vision", contextWindow: 8192, supportsVision: true, supportsStreaming: true)
+            ]
+        case .perplexity:
+            // Perplexity
+            return [
+                ModelInfo(id: "llama-3.1-sonar-large-128k-online", displayName: "Sonar Large Online", contextWindow: 127072, supportsVision: false, supportsStreaming: true),
+                ModelInfo(id: "llama-3.1-sonar-small-128k-online", displayName: "Sonar Small Online", contextWindow: 127072, supportsVision: false, supportsStreaming: true)
+            ]
+        case .google:
+            // Google AI (Gemini)
+            return [
+                ModelInfo(id: "gemini-2.0-flash", displayName: "Gemini 2.0 Flash", contextWindow: 1000000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "gemini-1.5-pro", displayName: "Gemini 1.5 Pro", contextWindow: 2000000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "gemini-1.5-flash", displayName: "Gemini 1.5 Flash", contextWindow: 1000000, supportsVision: true, supportsStreaming: true)
+            ]
         case .custom:
             // For custom providers, user should enter models manually or fetch from API
             return [
@@ -2131,6 +2326,17 @@ struct ProviderSetupView: View {
         case .openai: return "cpu"
         case .ollama: return "terminal"
         case .zhipu: return "sparkles"
+        case .groq: return "bolt"
+        case .cerebras: return "flame"
+        case .mistral: return "wind"
+        case .deepSeek: return "waveform.path"
+        case .together: return "person.3"
+        case .fireworks: return "sparkles"
+        case .openRouter: return "arrow.triangle.branch"
+        case .siliconFlow: return "memorychip"
+        case .xAI: return "x.square"
+        case .perplexity: return "magnifyingglass"
+        case .google: return "g.circle"
         case .custom: return "gearshape.2"
         }
     }
@@ -2141,6 +2347,17 @@ struct ProviderSetupView: View {
         case .openai: return Theme.Colors.openaiAccent
         case .ollama: return Theme.Colors.ollamaAccent
         case .zhipu: return Theme.Colors.zhipuAccent
+        case .groq: return Theme.Colors.groqAccent
+        case .cerebras: return Theme.Colors.cerebrasAccent
+        case .mistral: return Theme.Colors.mistralAccent
+        case .deepSeek: return Theme.Colors.deepSeekAccent
+        case .together: return Theme.Colors.togetherAccent
+        case .fireworks: return Theme.Colors.fireworksAccent
+        case .openRouter: return Theme.Colors.openRouterAccent
+        case .siliconFlow: return Theme.Colors.siliconFlowAccent
+        case .xAI: return Theme.Colors.xAIAccent
+        case .perplexity: return Theme.Colors.perplexityAccent
+        case .google: return Theme.Colors.googleAccent
         case .custom: return Theme.Colors.customAccent
         }
     }
