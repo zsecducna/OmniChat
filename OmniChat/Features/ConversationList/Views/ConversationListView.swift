@@ -57,6 +57,9 @@ struct ConversationListView: View {
     /// Show bulk delete confirmation.
     @State private var showBulkDeleteConfirmation = false
 
+    /// Show settings sheet.
+    @State private var showSettings = false
+
     /// Filtered conversations based on search text.
     private var filteredConversations: [Conversation] {
         if searchText.isEmpty {
@@ -207,7 +210,7 @@ struct ConversationListView: View {
                 }
             }
 
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 if isEditMode {
                     Button(role: .destructive) {
                         showBulkDeleteConfirmation = true
@@ -225,9 +228,15 @@ struct ConversationListView: View {
                         Image(systemName: "checkmark.circle")
                     }
                 }
+
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
             }
             #else
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 if isEditMode {
                     Button("Cancel") {
                         exitEditMode()
@@ -245,6 +254,12 @@ struct ConversationListView: View {
                     } label: {
                         Image(systemName: "checkmark.circle")
                     }
+                }
+
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
                 }
             }
             #endif
@@ -284,6 +299,12 @@ struct ConversationListView: View {
             if sortedConversations.isEmpty {
                 emptyStateView
             }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                #if os(macOS)
+                .frame(minWidth: 500, minHeight: 400)
+                #endif
         }
     }
 
