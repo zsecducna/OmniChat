@@ -181,26 +181,26 @@ final class HTTPClient: Sendable {
         case 200...299:
             return
         case 401:
-            Self.logger.warning("Unauthorized: invalid credentials")
+            Self.logger.warning("HTTP 401 Unauthorized: invalid credentials for \(httpResponse.url?.absoluteString ?? "unknown URL")")
             throw ProviderError.unauthorized
         case 403:
-            Self.logger.warning("Forbidden: access denied")
+            Self.logger.warning("HTTP 403 Forbidden: access denied for \(httpResponse.url?.absoluteString ?? "unknown URL")")
             throw ProviderError.unauthorized
         case 429:
             let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After")
                 .flatMap { TimeInterval($0) }
-            Self.logger.warning("Rate limited, retry after: \(retryAfter ?? 0) seconds")
+            Self.logger.warning("HTTP 429 Rate limited for \(httpResponse.url?.absoluteString ?? "unknown URL"), retry after: \(retryAfter ?? 0) seconds")
             throw ProviderError.rateLimited(retryAfter: retryAfter)
         case 400...499:
             let message = extractErrorMessage(from: httpResponse)
-            Self.logger.error("Client error (\(httpResponse.statusCode)): \(message ?? "no message")")
+            Self.logger.error("HTTP \(httpResponse.statusCode) client error for \(httpResponse.url?.absoluteString ?? "unknown URL"): \(message ?? "no message")")
             throw ProviderError.serverError(statusCode: httpResponse.statusCode, message: message)
         case 500...599:
             let message = extractErrorMessage(from: httpResponse)
-            Self.logger.error("Server error (\(httpResponse.statusCode)): \(message ?? "no message")")
+            Self.logger.error("HTTP \(httpResponse.statusCode) server error for \(httpResponse.url?.absoluteString ?? "unknown URL"): \(message ?? "no message")")
             throw ProviderError.serverError(statusCode: httpResponse.statusCode, message: message)
         default:
-            Self.logger.error("Unexpected status code: \(httpResponse.statusCode)")
+            Self.logger.error("HTTP \(httpResponse.statusCode) unexpected status code for \(httpResponse.url?.absoluteString ?? "unknown URL")")
             throw ProviderError.serverError(statusCode: httpResponse.statusCode, message: nil)
         }
     }

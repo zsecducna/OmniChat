@@ -128,6 +128,7 @@
 		B35F86708A1932B947ADA5D0 /* PKCE.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FC0EEE8C05DA21B53C5690 /* PKCE.swift */; };
 		B3B5D0C1F6A3383B9F7065D6 /* DenseLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B69EE8EEB6F698D64A09F46A /* DenseLayout.swift */; };
 		B3BA786CD8ECA1CB366CDDC8 /* HTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B992630E76A03CC9C323D413 /* HTTPClient.swift */; };
+		B5887A0E542D635A3441EE0C /* ZhipuAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA1B74B67342DD3116A81C4 /* ZhipuAdapter.swift */; };
 		B97A720F6054DBA84B2F7A98 /* StreamingResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A06372A485B1BE7D34307D /* StreamingResponseParser.swift */; };
 		BA802601BDF4D2948B05BCBC /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E38AA0377D78A02D2CF34C /* Date+Extensions.swift */; };
 		BAF8E6180408CD010B23EAE3 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A55B5DC7624CF6BDA5A76A /* String+Extensions.swift */; };
@@ -140,6 +141,7 @@
 		BD5ECAD0C946DB718A333D9B /* MigrationPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDEC7F7ACFD2ECDAA4572A61 /* MigrationPlan.swift */; };
 		C07AA2DB29DD061FDBD8F3C7 /* ErrorBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE8ED1DD49AF30A993345A99 /* ErrorBannerView.swift */; };
 		C215C3056FF2C098EED4536C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82800B02449E9E75D357AC1A /* ContentView.swift */; };
+		C22892A9C129B18B23037B9B /* ZhipuAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA1B74B67342DD3116A81C4 /* ZhipuAdapter.swift */; };
 		C28E7EC9613BF4125CAE636F /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F65B4ECC3CEAA1A0E9DD237 /* View+Extensions.swift */; };
 		C5D2850C794F52D3B08DBDF3 /* ProviderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E9D488B589324888C8684C /* ProviderManager.swift */; };
 		C5F68D6703D62595B08261AF /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CBAA942C9397C2C2DF8EA /* NetworkError.swift */; };
@@ -309,6 +311,7 @@
 		FD6B7F8FDFE18EE61C637571 /* OmniChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmniChatApp.swift; sourceTree = "<group>"; };
 		FD777A7EED9E8C206C22AA45 /* StreamingTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingTextView.swift; sourceTree = "<group>"; };
 		FE8ED1DD49AF30A993345A99 /* ErrorBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBannerView.swift; sourceTree = "<group>"; };
+		FFA1B74B67342DD3116A81C4 /* ZhipuAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhipuAdapter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -641,6 +644,7 @@
 				77673ABF5B817645D8CA294D /* CustomAdapter.swift */,
 				5D16E98AB4FF7680BC98CC60 /* OllamaAdapter.swift */,
 				CCBEE8996CD286D80D4B1E4C /* OpenAIAdapter.swift */,
+				FFA1B74B67342DD3116A81C4 /* ZhipuAdapter.swift */,
 			);
 			path = Adapters;
 			sourceTree = "<group>";
@@ -1122,6 +1126,7 @@
 				EE525F6ACF5EA7FDB66A8BAB /* UsageDashboardView.swift in Sources */,
 				F253A6BE0F01C3AF43229962 /* UsageRecord.swift in Sources */,
 				C28E7EC9613BF4125CAE636F /* View+Extensions.swift in Sources */,
+				C22892A9C129B18B23037B9B /* ZhipuAdapter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1212,6 +1217,7 @@
 				F11E5384D1005BA113F11E31 /* UsageDashboardView.swift in Sources */,
 				A124542F910C61F058C60F3D /* UsageRecord.swift in Sources */,
 				E0287027927A507AF3464127 /* View+Extensions.swift in Sources */,
+				B5887A0E542D635A3441EE0C /* ZhipuAdapter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

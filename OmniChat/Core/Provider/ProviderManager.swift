@@ -134,11 +134,29 @@ final class ProviderManager {
     func adapter(for config: ProviderConfig) throws -> any AIProvider {
         // Return cached adapter if available
         if let existing = adapters[config.id] {
+            Self.logger.debug("Returning cached adapter for '\(config.name)'")
             return existing
         }
 
         // Retrieve API key from Keychain
-        let apiKey = try KeychainManager.shared.readAPIKey(providerID: config.id) ?? ""
+        let apiKey: String
+        do {
+            if let key = try KeychainManager.shared.readAPIKey(providerID: config.id) {
+                // Trim whitespace to avoid authentication issues with malformed keys
+                let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedKey != key {
+                    Self.logger.warning("API key for '\(config.name)' had whitespace that was trimmed (original: \(key.count) chars, trimmed: \(trimmedKey.count) chars)")
+                }
+                apiKey = trimmedKey
+                Self.logger.debug("Retrieved API key from Keychain for '\(config.name)' (length: \(trimmedKey.count))")
+            } else {
+                apiKey = ""
+                Self.logger.warning("No API key found in Keychain for '\(config.name)' (providerID: \(config.id))")
+            }
+        } catch {
+            Self.logger.error("Failed to read API key from Keychain for '\(config.name)': \(error.localizedDescription)")
+            throw error
+        }
 
         // Create snapshot for Sendable adapter
         let snapshot = config.makeSnapshot()
@@ -159,10 +177,13 @@ final class ProviderManager {
             adapter = OllamaAdapter(config: snapshot)
             Self.logger.debug("Created Ollama adapter for '\(config.name)'")
 
+        case .zhipu:
+            adapter = try ZhipuAdapter(config: snapshot, apiKey: apiKey)
+            Self.logger.debug("Created Zhipu adapter for '\(config.name)'")
+
         case .custom:
-            // Custom adapter not yet implemented - throw error
-            // TODO: Implement CustomAdapter (TASK-7.2)
-            throw ProviderError.notSupported("Custom provider adapter not yet implemented")
+            adapter = CustomAdapter(config: snapshot, apiKey: apiKey.isEmpty ? nil : apiKey)
+            Self.logger.debug("Created Custom adapter for '\(config.name)'")
         }
 
         // Cache the adapter

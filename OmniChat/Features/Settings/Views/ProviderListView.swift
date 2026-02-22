@@ -161,6 +161,7 @@ struct ProviderListView: View {
             case .anthropic: return "brain"
             case .openai: return "cpu"
             case .ollama: return "desktopcomputer"
+            case .zhipu: return "sparkles"
             case .custom: return "ellipsis.circle"
             }
         }
@@ -171,6 +172,7 @@ struct ProviderListView: View {
             case .anthropic: return Theme.Colors.anthropicAccent
             case .openai: return Theme.Colors.openaiAccent
             case .ollama: return Theme.Colors.ollamaAccent
+            case .zhipu: return Theme.Colors.zhipuAccent
             case .custom: return Theme.Colors.customAccent
             }
         }
@@ -261,6 +263,7 @@ extension ProviderType {
         case .anthropic: return "Anthropic Claude"
         case .openai: return "OpenAI GPT"
         case .ollama: return "Ollama (Local)"
+        case .zhipu: return "Z.AI (ZhipuAI)"
         case .custom: return "Custom Endpoint"
         }
     }

@@ -191,6 +191,8 @@ struct DefaultsSettingsView: View {
             return Theme.Colors.openaiAccent
         case .ollama:
             return Theme.Colors.ollamaAccent
+        case .zhipu:
+            return Theme.Colors.zhipuAccent
         case .custom:
             return Theme.Colors.customAccent
         }
