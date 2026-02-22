@@ -19,6 +19,7 @@ import SwiftData
 /// - Search filtering by title and message content
 /// - Swipe actions for quick operations
 /// - Context menu for rename and delete
+/// - Bulk selection and delete
 struct ConversationListView: View {
     /// The currently selected conversation.
     @Binding var selectedConversation: Conversation?
@@ -46,6 +47,15 @@ struct ConversationListView: View {
 
     /// Conversation to delete with confirmation.
     @State private var conversationToDelete: Conversation?
+
+    /// Bulk edit mode state.
+    @State private var isEditMode = false
+
+    /// Selected conversations for bulk operations.
+    @State private var selectedConversations: Set<Conversation.ID> = []
+
+    /// Show bulk delete confirmation.
+    @State private var showBulkDeleteConfirmation = false
 
     /// Filtered conversations based on search text.
     private var filteredConversations: [Conversation] {
@@ -129,10 +139,17 @@ struct ConversationListView: View {
     // MARK: - Content View
 
     private var contentView: some View {
-        List(selection: $selectedConversation) {
+        List(selection: isEditMode ? $selectedConversations : Binding(
+            get: { selectedConversation.map { [$0.id] } ?? [] },
+            set: { newValue in
+                if let firstId = newValue.first {
+                    selectedConversation = sortedConversations.first { $0.id == firstId }
+                }
+            }
+        )) {
             ForEach(sortedConversations) { conversation in
                 ConversationRow(conversation: conversation)
-                    .tag(conversation)
+                    .tag(conversation.id)
                     .contextMenu {
                         // Rename option
                         Button {
@@ -182,15 +199,100 @@ struct ConversationListView: View {
         }
         .listStyle(.sidebar)
         .searchable(text: $searchText, prompt: "Search conversations")
-        .navigationTitle("Conversations")
+        .navigationTitle(isEditMode ? "Select Conversations" : "Conversations")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .navigationBarLeading) {
+                if isEditMode {
+                    Button("Cancel") {
+                        exitEditMode()
+                    }
+                } else {
+                    EditButton()
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                if isEditMode {
+                    Menu {
+                        Button(role: .destructive) {
+                            showBulkDeleteConfirmation = true
+                        } label: {
+                            Label("Delete Selected (\(selectedConversations.count))", systemImage: "trash")
+                        }
+                    } label: {
+                        Text("\(selectedConversations.count)")
+                            .font(.caption)
+                            .padding(6)
+                            .background(Circle().fill(Theme.Colors.accent))
+                            .foregroundStyle(.white)
+                    }
+                    .disabled(selectedConversations.isEmpty)
+                } else {
+                    Button {
+                        isEditMode = true
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                    }
+                }
+            }
+            #else
+            ToolbarItem(placement: .primaryAction) {
+                if isEditMode {
+                    Button("Cancel") {
+                        exitEditMode()
+                    }
+
+                    Button(role: .destructive) {
+                        showBulkDeleteConfirmation = true
+                    } label: {
+                        Label("Delete (\(selectedConversations.count))", systemImage: "trash")
+                    }
+                    .disabled(selectedConversations.isEmpty)
+                } else {
+                    Button {
+                        isEditMode = true
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                    }
+                }
+            }
+            #endif
+        }
+        .confirmationDialog(
+            "Delete \(selectedConversations.count) Conversations?",
+            isPresented: $showBulkDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteSelectedConversations()
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
         .overlay {
             if sortedConversations.isEmpty {
                 emptyStateView
             }
         }
+    }
+
+    // MARK: - Edit Mode Helpers
+
+    private func exitEditMode() {
+        isEditMode = false
+        selectedConversations.removeAll()
+    }
+
+    private func deleteSelectedConversations() {
+        for conversation in sortedConversations where selectedConversations.contains(conversation.id) {
+            modelContext.delete(conversation)
+        }
+        try? modelContext.save()
+        exitEditMode()
     }
 
     // MARK: - Loading State

@@ -16,6 +16,7 @@ import os
 ///
 /// Features:
 /// - Display provider name, type icon, and status badge
+/// - Search/filter providers by name or type
 /// - Add new provider via toolbar button
 /// - Edit provider via tap gesture
 /// - Swipe to delete (with confirmation)
@@ -42,12 +43,27 @@ struct ProviderListView: View {
     @State private var providerToEdit: ProviderConfig?
     @State private var providerToDelete: ProviderConfig?
     @State private var showDeleteConfirmation = false
+    @State private var searchText = ""
+
+    // MARK: - Computed Properties
+
+    /// Filtered providers based on search text.
+    private var filteredProviders: [ProviderConfig] {
+        if searchText.isEmpty {
+            return providers
+        }
+        return providers.filter { provider in
+            provider.name.localizedCaseInsensitiveContains(searchText) ||
+            provider.providerType.displayName.localizedCaseInsensitiveContains(searchText) ||
+            provider.providerType.rawValue.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
     // MARK: - Body
 
     var body: some View {
         List {
-            ForEach(providers) { provider in
+            ForEach(filteredProviders) { provider in
                 ProviderRow(provider: provider, colorScheme: colorScheme)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -73,6 +89,7 @@ struct ProviderListView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .searchable(text: $searchText, prompt: "Search providers")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
