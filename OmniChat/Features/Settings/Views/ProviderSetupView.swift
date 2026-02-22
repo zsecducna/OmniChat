@@ -384,9 +384,6 @@ struct ProviderSetupView: View {
             }
         }
         .formStyle(.grouped)
-        .safeAreaInset(edge: .bottom) {
-            continueButton(canProceed: canProceedFromAuthStep)
-        }
     }
 
     // MARK: - Auth Method Picker Section
@@ -1631,6 +1628,8 @@ struct ProviderSetupView: View {
                     if isValid {
                         isValidated = true
                         validationError = nil
+                        // Auto-advance to next step after successful validation
+                        advanceToNextStep()
                     } else {
                         validationError = "Invalid credentials"
                     }
