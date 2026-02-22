@@ -1,8 +1,8 @@
 # OmniChat Agent Task Board
 
-## Current Phase: Phase 7 — Ollama & Custom Providers
+## Current Phase: Phase 8 — Token Tracking & Usage Dashboard
 
-## Phase 0, 1, 2, 3, 4, 5 & 6 Summary (COMPLETE)
+## Phase 0, 1, 2, 3, 4, 5, 6 & 7 Summary (COMPLETE)
 - **Phase 0**: Xcode project, dependencies, directory structure, SwiftData container, design system
 - **Phase 1**: SwiftData models, KeychainManager, AIProvider protocol, HTTPClient, SSEParser, AnthropicAdapter, OpenAIAdapter, ProviderManager
 - **Phase 2**: ContentView, ConversationListView, ChatView, MessageBubble, MessageInputBar, ChatViewModel, StreamingTextView
@@ -10,12 +10,21 @@
 - **Phase 4**: MarkdownParser, SyntaxHighlighter, CodeBlockView, MessageBubble with Markdown, AttachmentPicker, ModelSwitcher
 - **Phase 5**: PersonaListView, PersonaEditorView, PersonaPicker, Personas connected to Chat
 - **Phase 6**: CloudKit configuration, Sync conflicts, Attachment thumbnails, UI polish
+- **Phase 7**: OllamaAdapter, CustomAdapter, ProviderSetupView for Ollama/Custom
 
 ---
 
 ## Task Status
 
-### Phase 7 Tasks
+### Phase 8 Tasks
+
+| Task ID | Description | Agent | Status | Blockers | Notes |
+|---------|-------------|-------|--------|----------|-------|
+| TASK-8.1 | Enhance UsageRecord | core | DONE | — | UsageRecord enhanced in Core/Data/Models/UsageRecord.swift with: (1) Static query methods: fetchByDateRange(from:to:context:), fetchByProvider(providerID:context:), fetchByConversation(conversationID:context:), fetchByModel(modelID:context:), fetchTotalUsage(context:); (2) UsageStatistics struct with aggregate totals, provider/model breakdowns, first/last usage dates; (3) ProviderUsageStats and ModelUsageStats structs for breakdown data; (4) fetchDailyUsage(from:to:context:calendar:) for day-grouped statistics; (5) DailyUsageStats struct for per-day aggregations; (6) recordUsage(...) static factory method for creating and inserting records in one call. All types Sendable for Swift 6 concurrency. iOS build succeeds. |
+| TASK-8.2 | Implement UsageDashboardView | ui | TODO | — | Usage dashboard with charts and statistics |
+| TASK-8.3 | Add Cost Calculations | core | TODO | — | Real-time cost estimation based on model pricing |
+
+### Phase 7 Tasks (COMPLETE)
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
@@ -87,10 +96,11 @@
 
 ## Blockers
 
-Pre-existing build errors in ProviderSetupView.swift (UI Agent responsibility) prevent full build verification. Core files (CustomAdapter, ProviderConfig, ProviderManager) compile correctly.
+None - Phase 7 complete. Both iOS and macOS builds succeed.
 
 ## Decisions Log
 
+- [2026-02-22] PHASE 7 COMPLETE: All 3 Phase 7 tasks completed. Ollama & Custom Providers are now supported. Key accomplishments: (1) OllamaAdapter with NDJSON streaming, local server support, no auth; (2) CustomAdapter with configurable API format (OpenAI/Anthropic), streaming format (SSE/NDJSON/None), custom headers; (3) ProviderSetupView updated with Ollama/Custom provider configuration UI. Both iOS and macOS builds succeed. Ready for Phase 8 (Token Tracking & Usage Dashboard).
 - [2026-02-22] TASK-7.2 completed: CustomAdapter implemented in Core/Provider/Adapters/CustomAdapter.swift. Features: (1) Conforms to AIProvider protocol with full streaming support; (2) Reads all config from ProviderConfigSnapshot (baseURL, apiPath, apiFormat, streamingFormat, customHeaders, apiKeyHeader, apiKeyPrefix); (3) Two API format modes: OpenAI-compatible (reuses OpenAI request/response parsing logic) and Anthropic-compatible (reuses Anthropic request/response parsing logic); (4) Three streaming formats: SSE (Server-Sent Events via SSEParser), NDJSON (Newline-Delimited JSON), none (non-streaming); (5) Configurable authentication via custom header name and prefix; (6) Vision support for both API formats; (7) Token counting from streaming metadata; (8) Optional API key (nil for no auth). Added new enums to ProviderConfig.swift: APIFormat (openAI, anthropic) with defaultAPIPath property, StreamingFormat (sse, ndjson, none) with supportsStreaming property. Added new fields to ProviderConfig: apiPath, apiFormatRaw, streamingFormatRaw, apiKeyHeader, apiKeyPrefix. Updated ProviderConfigSnapshot with all new fields. Updated ProviderManager to create CustomAdapter instances. This is the "escape hatch" for any provider - users can configure arbitrary OpenAI/Anthropic-compatible APIs.
 - [2026-02-22] TASK-7.1 completed: OllamaAdapter implemented in Core/Provider/Adapters/OllamaAdapter.swift. Features: (1) NDJSON streaming support (newline-delimited JSON); (2) Chat API via POST /api/chat with messages array; (3) Model listing via GET /api/tags; (4) No authentication required; (5) Vision support via base64 images array; (6) Default models fallback when server unreachable (llama3.2, mistral, codellama, phi3, gemma2, llava); (7) Token counts from eval_count and prompt_eval_count in final chunk; (8) Updated ProviderManager to create OllamaAdapter instances.
 - [2026-02-22] PHASE 6 COMPLETE: All 4 Phase 6 tasks completed. iCloud Sync & Polish is fully implemented. Key accomplishments: (1) CloudKit container configured with comprehensive testing documentation; (2) Sync conflict resolution with last-write-wins semantics; (3) AttachmentManager for thumbnail generation with cross-platform ImageIO support; (4) UI polish with ErrorBannerView, animations, and haptic feedback. Both iOS and macOS builds succeed. Ready for Phase 7 (Ollama & Custom Providers).
