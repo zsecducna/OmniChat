@@ -510,6 +510,9 @@ final class ChatViewModel {
 
     /// Records usage statistics for a message.
     ///
+    /// Uses model-level pricing from CostCalculator for accurate cost estimation.
+    /// Falls back to provider-level pricing if model pricing is not available.
+    ///
     /// - Parameters:
     ///   - inputTokens: Number of input tokens used.
     ///   - outputTokens: Number of output tokens generated.
@@ -526,16 +529,21 @@ final class ChatViewModel {
             return
         }
 
-        // Calculate cost
-        let cost = providerConfig.calculateCost(
+        // Calculate cost using model-level pricing from CostCalculator
+        // This provides accurate per-model pricing based on the official rates
+        let cost = CostCalculator.calculateCost(
             inputTokens: inputTokens,
-            outputTokens: outputTokens
+            outputTokens: outputTokens,
+            modelID: modelID
         )
 
-        // Update conversation cost estimate
+        // Update conversation totals
+        conversation.totalInputTokens += inputTokens
+        conversation.totalOutputTokens += outputTokens
         conversation.estimatedCostUSD += cost
+        conversation.updatedAt = Date()
 
-        // Create usage record
+        // Create usage record for detailed tracking
         let usageRecord = UsageRecord(
             providerConfigID: providerConfig.id,
             modelID: modelID,
@@ -547,7 +555,7 @@ final class ChatViewModel {
         )
         modelContext.insert(usageRecord)
 
-        Self.logger.debug("Recorded usage: \(inputTokens) input, \(outputTokens) output, $\(String(format: "%.6f", cost))")
+        Self.logger.debug("Recorded usage: \(inputTokens) input, \(outputTokens) output, \(CostCalculator.formatCost(cost)) for model \(modelID)")
     }
 }
 

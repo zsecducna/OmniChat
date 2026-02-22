@@ -392,6 +392,26 @@ final class ProviderConfig {
         return inputCost + outputCost
     }
 
+    /// Calculates the cost for a specific model using model-level pricing.
+    ///
+    /// Uses the model's pricing data from `availableModels` if available,
+    /// otherwise falls back to CostCalculator's default pricing.
+    ///
+    /// - Parameters:
+    ///   - inputTokens: Number of input tokens
+    ///   - outputTokens: Number of output tokens
+    ///   - modelID: The model ID to get pricing for
+    /// - Returns: Estimated cost in USD
+    func calculateCost(inputTokens: Int, outputTokens: Int, modelID: String) -> Double {
+        // Try to find the model in available models
+        if let modelInfo = availableModels.first(where: { $0.id == modelID }) {
+            return modelInfo.calculateCost(inputTokens: inputTokens, outputTokens: outputTokens)
+        }
+
+        // Fall back to CostCalculator's default pricing
+        return CostCalculator.calculateCost(inputTokens: inputTokens, outputTokens: outputTokens, modelID: modelID)
+    }
+
     /// Creates a Sendable snapshot of this configuration.
     /// - Returns: A `ProviderConfigSnapshot` containing all configuration data.
     func makeSnapshot() -> ProviderConfigSnapshot {
@@ -486,5 +506,25 @@ struct ProviderConfigSnapshot: Sendable {
         let inputCost = (costPerInputToken ?? 0) * Double(inputTokens)
         let outputCost = (costPerOutputToken ?? 0) * Double(outputTokens)
         return inputCost + outputCost
+    }
+
+    /// Calculates the cost for a specific model using model-level pricing.
+    ///
+    /// Uses the model's pricing data from `availableModels` if available,
+    /// otherwise falls back to CostCalculator's default pricing.
+    ///
+    /// - Parameters:
+    ///   - inputTokens: Number of input tokens
+    ///   - outputTokens: Number of output tokens
+    ///   - modelID: The model ID to get pricing for
+    /// - Returns: Estimated cost in USD
+    func calculateCost(inputTokens: Int, outputTokens: Int, modelID: String) -> Double {
+        // Try to find the model in available models
+        if let modelInfo = availableModels.first(where: { $0.id == modelID }) {
+            return modelInfo.calculateCost(inputTokens: inputTokens, outputTokens: outputTokens)
+        }
+
+        // Fall back to CostCalculator's default pricing
+        return CostCalculator.calculateCost(inputTokens: inputTokens, outputTokens: outputTokens, modelID: modelID)
     }
 }
