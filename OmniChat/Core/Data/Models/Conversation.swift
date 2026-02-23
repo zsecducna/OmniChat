@@ -52,6 +52,7 @@ final class Conversation {
     var modelID: String?
     var systemPrompt: String?
     var personaID: UUID?
+    var draftMessage: String?
     var totalInputTokens: Int = 0
     var totalOutputTokens: Int = 0
     var estimatedCostUSD: Double = 0.0
@@ -72,6 +73,7 @@ final class Conversation {
         modelID: String? = nil,
         systemPrompt: String? = nil,
         personaID: UUID? = nil,
+        draftMessage: String? = nil,
         totalInputTokens: Int = 0,
         totalOutputTokens: Int = 0,
         estimatedCostUSD: Double = 0.0
@@ -86,6 +88,7 @@ final class Conversation {
         self.modelID = modelID
         self.systemPrompt = systemPrompt
         self.personaID = personaID
+        self.draftMessage = draftMessage
         self.totalInputTokens = totalInputTokens
         self.totalOutputTokens = totalOutputTokens
         self.estimatedCostUSD = estimatedCostUSD

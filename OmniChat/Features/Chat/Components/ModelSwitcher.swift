@@ -251,6 +251,10 @@ private struct ModelPickerSheet: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var searchText = ""
+    @State private var expandedProviders: Set<UUID> = []
+
+    /// Maximum number of models to show per provider before "Show all" button
+    private let maxModelsPerProvider = 3
 
     var body: some View {
         NavigationStack {
@@ -319,7 +323,11 @@ private struct ModelPickerSheet: View {
                    model.id.localizedCaseInsensitiveContains(searchText)
         }
 
-        ForEach(filteredModels, id: \.id) { model in
+        let isExpanded = expandedProviders.contains(provider.id)
+        let limitedModels = Array(filteredModels.prefix(isExpanded ? filteredModels.count : maxModelsPerProvider))
+        let hasMoreModels = filteredModels.count > maxModelsPerProvider
+
+        ForEach(limitedModels, id: \.id) { model in
             ModelPickerRow(
                 provider: provider,
                 model: model,
@@ -329,6 +337,25 @@ private struct ModelPickerSheet: View {
                 selectedModelID = model.id
                 isPresented = false
             }
+        }
+
+        // Show all / Show less button
+        if hasMoreModels && searchText.isEmpty {
+            Button {
+                if isExpanded {
+                    expandedProviders.remove(provider.id)
+                } else {
+                    expandedProviders.insert(provider.id)
+                }
+            } label: {
+                HStack {
+                    Spacer()
+                    Text(isExpanded ? "Show less" : "Show all (\(filteredModels.count - maxModelsPerProvider) more)")
+                        .font(Theme.Typography.caption)
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -352,6 +379,9 @@ private struct ModelPickerMenuContent: View {
     @Binding var selectedModelID: String?
     let providerManager: ProviderManager
 
+    /// Maximum number of models to show per provider
+    private let maxModelsPerProvider = 3
+
     var body: some View {
         // Group by provider type
         ForEach(ProviderType.allCases, id: \.self) { providerType in
@@ -369,9 +399,11 @@ private struct ModelPickerMenuContent: View {
 
     @ViewBuilder
     private func providerSubmenu(for provider: ProviderConfig) -> some View {
-        let models = provider.availableModels.isEmpty ? [provider.defaultModel].compactMap { $0 } : provider.availableModels
+        let allModels = provider.availableModels.isEmpty ? [provider.defaultModel].compactMap { $0 } : provider.availableModels
+        let limitedModels = Array(allModels.prefix(maxModelsPerProvider))
+        let hasMoreModels = allModels.count > maxModelsPerProvider
 
-        if models.isEmpty {
+        if allModels.isEmpty {
             Button {
                 selectedProviderID = provider.id
                 selectedModelID = nil
@@ -389,7 +421,8 @@ private struct ModelPickerMenuContent: View {
             }
         } else {
             Menu(provider.name) {
-                ForEach(models, id: \.id) { model in
+                // Show limited models
+                ForEach(limitedModels, id: \.id) { model in
                     Button {
                         selectedProviderID = provider.id
                         selectedModelID = model.id
@@ -402,6 +435,33 @@ private struct ModelPickerMenuContent: View {
                             }
                             if selectedProviderID == provider.id && selectedModelID == model.id {
                                 Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+
+                // Show "More models..." submenu if needed
+                if hasMoreModels {
+                    let remainingModels = Array(allModels.dropFirst(maxModelsPerProvider))
+
+                    Divider()
+
+                    Menu("More models...") {
+                        ForEach(remainingModels, id: \.id) { model in
+                            Button {
+                                selectedProviderID = provider.id
+                                selectedModelID = model.id
+                            } label: {
+                                HStack {
+                                    Text(model.displayName)
+                                    Spacer()
+                                    if model.supportsVision {
+                                        Image(systemName: "eye")
+                                    }
+                                    if selectedProviderID == provider.id && selectedModelID == model.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
                             }
                         }
                     }
@@ -420,7 +480,11 @@ private struct ModelPickerPopover: View {
     @Binding var isPresented: Bool
 
     @State private var searchText = ""
+    @State private var expandedProviders: Set<UUID> = []
     @Environment(\.colorScheme) private var colorScheme
+
+    /// Maximum number of models to show per provider before "Show all" button
+    private let maxModelsPerProvider = 3
 
     var body: some View {
         VStack(spacing: 0) {
@@ -472,7 +536,11 @@ private struct ModelPickerPopover: View {
                    model.id.localizedCaseInsensitiveContains(searchText)
         }
 
-        ForEach(filteredModels, id: \.id) { model in
+        let isExpanded = expandedProviders.contains(provider.id)
+        let limitedModels = Array(filteredModels.prefix(isExpanded ? filteredModels.count : maxModelsPerProvider))
+        let hasMoreModels = filteredModels.count > maxModelsPerProvider
+
+        ForEach(limitedModels, id: \.id) { model in
             Button {
                 selectedProviderID = provider.id
                 selectedModelID = model.id
@@ -505,6 +573,24 @@ private struct ModelPickerPopover: View {
                 .padding(.horizontal, Theme.Spacing.small.rawValue)
                 .padding(.vertical, Theme.Spacing.extraSmall.rawValue)
                 .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+
+        // Show all / Show less button
+        if hasMoreModels && searchText.isEmpty {
+            Button {
+                if isExpanded {
+                    expandedProviders.remove(provider.id)
+                } else {
+                    expandedProviders.insert(provider.id)
+                }
+            } label: {
+                Text(isExpanded ? "Show less" : "Show all (\(filteredModels.count - maxModelsPerProvider) more)")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Spacing.extraSmall.rawValue)
             }
             .buttonStyle(.plain)
         }

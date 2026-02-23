@@ -166,9 +166,9 @@ struct PersonaPicker: View {
 
     private var pillContent: some View {
         HStack(spacing: Theme.Spacing.tight.rawValue) {
-            // Persona icon
+            // Persona icon (larger, no circle background)
             Image(systemName: displayIcon)
-                .font(.system(size: isCompact ? 10 : 12))
+                .font(.system(size: isCompact ? 14 : 18))
                 .foregroundStyle(selectedPersona != nil
                                  ? AnyShapeStyle(Theme.Colors.accent)
                                  : AnyShapeStyle(Theme.Colors.tertiaryText.resolve(in: colorScheme)))

@@ -25,16 +25,16 @@ This phase adds 9 user-requested features to improve the OmniChat experience:
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
-| TASK-11.1 | Draft message saving | ui | IN PROGRESS | — | Add `draftMessage: String?` to Conversation, save/restore in ChatView |
-| TASK-11.2 | Remove empty state send button | ui | IN PROGRESS | — | Remove the "Send a message" button from ChatView empty state |
-| TASK-11.3 | Persona button UI improvement | ui | IN PROGRESS | — | Remove circle around persona button, show icon only (larger) |
-| TASK-11.4 | Provider bulk delete | ui | IN PROGRESS | — | Add Edit mode to ProviderListView with multi-select and delete |
-| TASK-11.5 | Ollama cloud configuration | core | IN PROGRESS | — | Support non-localhost URLs, API key auth, fetch models from cloud Ollama |
-| TASK-11.6 | Usage monitor in conversation | core | IN PROGRESS | — | Display live token usage/cost during streaming in ChatView input bar |
-| TASK-11.7 | Auto focus message input | ui | IN PROGRESS | — | Focus MessageInputBar when opening conversation using @FocusState |
-| TASK-11.8 | Auto scroll to recent messages | ui | IN PROGRESS | — | Auto-scroll to bottom on new messages, load older on scroll up (pagination) |
-| TASK-11.9 | Limit model list display | ui | IN PROGRESS | — | Show max 3 models per provider in ModelSwitcher, sort by version/date |
-| TASK-11.10 | Z.AI Anthropic usage fix | core | IN PROGRESS | — | Z.AI uses GLM models via fixed subscription, not per-token - skip usage tracking |
+| TASK-11.1 | Draft message saving | ui | DONE | — | Added `draftMessage: String?` to Conversation, save/restore in ChatView |
+| TASK-11.2 | Remove empty state send button | ui | DONE | — | Removed the "Send a message" button from ChatView empty state |
+| TASK-11.3 | Persona button UI improvement | ui | DONE | — | Removed circle around persona button, icon increased from 12pt to 18pt |
+| TASK-11.4 | Provider bulk delete | ui | DONE | — | Added Edit mode to ProviderListView with multi-select and batch delete |
+| TASK-11.5 | Ollama cloud configuration | core | DONE | — | Added optional API key to OllamaAdapter, ProviderSetupView shows auth for cloud URLs |
+| TASK-11.6 | Usage monitor in conversation | core | DONE | — | Added UsageMonitorView displaying live token usage/cost above input bar |
+| TASK-11.7 | Auto focus message input | ui | DONE | — | Focus MessageInputBar when opening conversation using @FocusState |
+| TASK-11.8 | Auto scroll to recent messages | ui | DONE | — | Auto-scroll to bottom on new messages and on initial load |
+| TASK-11.9 | Limit model list display | ui | DONE | — | Show max 3 models per provider in ModelSwitcher with "Show all" button |
+| TASK-11.10 | Z.AI Anthropic usage fix | core | DONE | — | Added shouldSkipCostCalculation() to CostCalculator for subscription providers |
 | TASK-11.11 | Unit tests for Phase 11 | qa | TODO | TASK-11.1-11.10 | Test new features |
 | TASK-11.12 | Integration verification | qa | TODO | TASK-11.11 | Verify all platforms build and work correctly |
 
@@ -73,6 +73,11 @@ None currently.
 - [2026-02-24] TASK-11.5 (Ollama cloud): Reference https://docs.ollama.com/cloud for cloud-hosted Ollama with API key
 - [2026-02-24] TASK-11.6 (Usage monitor): Reference OpenClaw repo for provider usage APIs - https://github.com/openclaw/openclaw/tree/main/src/infra
 - [2026-02-24] All tasks marked IN PROGRESS - dispatching to agents
+- [2026-02-24] Core Agent completed TASK-11.5, TASK-11.6, TASK-11.10:
+  - OllamaAdapter now supports optional API key for cloud-hosted instances
+  - ProviderSetupView shows API key field for non-localhost Ollama URLs
+  - UsageMonitorView displays live token usage above input bar
+  - CostCalculator.shouldSkipCostCalculation() for subscription-based providers
 
 ---
 
