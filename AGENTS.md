@@ -25,16 +25,16 @@ This phase adds 9 user-requested features to improve the OmniChat experience:
 
 | Task ID | Description | Agent | Status | Blockers | Notes |
 |---------|-------------|-------|--------|----------|-------|
-| TASK-11.1 | Draft message saving | ui | TODO | — | Add `draftMessage: String?` to Conversation, save/restore in ChatView |
-| TASK-11.2 | Remove empty state send button | ui | TODO | — | Remove the "Send a message" button from ChatView empty state |
-| TASK-11.3 | Persona button UI improvement | ui | TODO | — | Remove circle around persona button, show icon only (larger) |
-| TASK-11.4 | Provider bulk delete | ui | TODO | — | Add Edit mode to ProviderListView with multi-select and delete |
-| TASK-11.5 | Ollama cloud configuration | core | TODO | — | Support non-localhost URLs, API key auth, fetch models from cloud Ollama |
-| TASK-11.6 | Usage monitor in conversation | core | TODO | — | Display live token usage/cost during streaming in ChatView input bar |
-| TASK-11.7 | Auto focus message input | ui | TODO | — | Focus MessageInputBar when opening conversation using @FocusState |
-| TASK-11.8 | Auto scroll to recent messages | ui | TODO | — | Auto-scroll to bottom on new messages, load older on scroll up (pagination) |
-| TASK-11.9 | Limit model list display | ui | TODO | — | Show max 3 models per provider in ModelSwitcher, sort by version/date |
-| TASK-11.10 | Z.AI Anthropic usage fix | core | TODO | — | Z.AI uses GLM models via fixed subscription, not per-token - skip usage tracking |
+| TASK-11.1 | Draft message saving | ui | IN PROGRESS | — | Add `draftMessage: String?` to Conversation, save/restore in ChatView |
+| TASK-11.2 | Remove empty state send button | ui | IN PROGRESS | — | Remove the "Send a message" button from ChatView empty state |
+| TASK-11.3 | Persona button UI improvement | ui | IN PROGRESS | — | Remove circle around persona button, show icon only (larger) |
+| TASK-11.4 | Provider bulk delete | ui | IN PROGRESS | — | Add Edit mode to ProviderListView with multi-select and delete |
+| TASK-11.5 | Ollama cloud configuration | core | IN PROGRESS | — | Support non-localhost URLs, API key auth, fetch models from cloud Ollama |
+| TASK-11.6 | Usage monitor in conversation | core | IN PROGRESS | — | Display live token usage/cost during streaming in ChatView input bar |
+| TASK-11.7 | Auto focus message input | ui | IN PROGRESS | — | Focus MessageInputBar when opening conversation using @FocusState |
+| TASK-11.8 | Auto scroll to recent messages | ui | IN PROGRESS | — | Auto-scroll to bottom on new messages, load older on scroll up (pagination) |
+| TASK-11.9 | Limit model list display | ui | IN PROGRESS | — | Show max 3 models per provider in ModelSwitcher, sort by version/date |
+| TASK-11.10 | Z.AI Anthropic usage fix | core | IN PROGRESS | — | Z.AI uses GLM models via fixed subscription, not per-token - skip usage tracking |
 | TASK-11.11 | Unit tests for Phase 11 | qa | TODO | TASK-11.1-11.10 | Test new features |
 | TASK-11.12 | Integration verification | qa | TODO | TASK-11.11 | Verify all platforms build and work correctly |
 
@@ -72,70 +72,160 @@ None currently.
 - [2026-02-24] Feature 4 split into two parts: 4.1 Provider bulk delete (UI), 4.2 Ollama cloud config (Core)
 - [2026-02-24] TASK-11.5 (Ollama cloud): Reference https://docs.ollama.com/cloud for cloud-hosted Ollama with API key
 - [2026-02-24] TASK-11.6 (Usage monitor): Reference OpenClaw repo for provider usage APIs - https://github.com/openclaw/openclaw/tree/main/src/infra
+- [2026-02-24] All tasks marked IN PROGRESS - dispatching to agents
 
 ---
 
-## Integration Notes
+## UI Agent Tasks (7 tasks) - DISPATCHED
 
-### TASK-11.1 (Draft message saving)
-- Add `draftMessage: String?` to Conversation SwiftData model
-- Save draft in ChatView `onDisappear` when input text is not empty
-- Restore draft in ChatView `onAppear` and clear after send
-- Clear draft when message is sent successfully
+### TASK-11.1: Draft Message Saving
+**Files**:
+- `/Users/z/Projects/OmniChat/OmniChat/Core/Data/Models/Conversation.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Views/ChatView.swift`
 
-### TASK-11.3 (Persona button UI)
-- Current: Persona button has circular background, icon appears small
-- Target: Remove circle, show larger icon directly
-- File: ChatView.swift toolbar or ChatToolbar.swift
+**Implementation**:
+1. Add `var draftMessage: String? = nil` to Conversation SwiftData model
+2. In ChatView, add `.onDisappear` to save inputText to conversation.draftMessage (if not empty)
+3. In ChatView, add `.onAppear` to restore draftMessage to inputText
+4. Clear draftMessage after successful message send
 
-### TASK-11.4 (Provider bulk delete)
-- Add Edit button to ProviderListView toolbar
-- Use SwiftUI selection binding for multi-select in edit mode
-- Show trash icon with count badge (like conversation bulk delete)
-- Batch delete with confirmation dialog
+### TASK-11.2: Remove Empty State Send Button
+**File**: `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Views/ChatView.swift`
 
-### TASK-11.5 (Ollama cloud configuration)
-- OllamaAdapter needs to support:
-  - Custom baseURL for cloud-hosted instances
-  - API key authentication (header-based)
-  - Model fetching from cloud endpoints
-- ProviderSetupView needs:
-  - Allow non-localhost URLs for Ollama type
-  - API key input field for cloud Ollama
-  - Info text about Ollama cloud (docs.ollama.com/cloud)
-- Reference: https://github.com/ollama/ollama-python/tree/main
+**Implementation**:
+1. Find `readyToChatEmptyStateView` (lines 387-405)
+2. Remove the Button from the `actions` block
+3. Keep just the Label and description text
 
-### TASK-11.6 (Usage monitor in conversation)
-- Use existing StreamEvent.inputTokenCount/outputTokenCount
-- Display live usage above message input bar
-- Providers to implement usage APIs (reference OpenClaw):
-  - Claude: x-api-key header, usage in response
-  - Codex: OpenAI-compatible
-  - Copilot: GitHub auth
-  - Gemini: Google AI SDK
-  - Minimax: Custom API
-  - Z.AI: Skip (TASK-11.10)
-- Files to reference: https://github.com/openclaw/openclaw/tree/main/src/infra
-  - provider-usage.fetch.ts
-  - provider-usage.fetch.<provider>.ts
+### TASK-11.3: Persona Button UI
+**File**: `/Users/z/Projects/OmniChat/OmniChat/Features/Personas/Views/PersonaPicker.swift`
 
-### TASK-11.8 (Auto scroll to recent)
-- Use ScrollViewReader with scrollTo on new messages
-- Implement pagination: load older messages when scrolling to top
-- Use LazyVStack for performance with large message lists
-- Track scroll position to detect "scroll to top" gesture
+**Implementation**:
+1. Find the circular background styling in PersonaPicker
+2. Remove the circle background
+3. Make the icon larger (e.g., from 16pt to 20-24pt)
+4. Keep the same tap functionality
 
-### TASK-11.9 (Limit model list)
-- ModelSwitcher shows max 3 models per provider
-- Sort by version/date (newest first)
-- Add "Show all" expand option for each provider
-- Store collapsed/expanded state in UserDefaults
+### TASK-11.4: Provider Bulk Delete
+**File**: `/Users/z/Projects/OmniChat/OmniChat/Features/Settings/Views/ProviderListView.swift`
 
-### TASK-11.10 (Z.AI Anthropic usage)
-- Z.AI (Zhipu) uses GLM models, not Claude
-- Billing is fixed subscription, not per-token
-- Skip usage tracking/cost calculation for Z.AI provider
-- Update CostCalculator to check provider type before calculating
+**Implementation**:
+1. Add `@State private var selectedProviders: Set<ProviderConfig.ID> = []`
+2. Add `@State private var isEditMode = false`
+3. Modify toolbar to show "Edit"/"Done" button
+4. In edit mode: enable multi-select on List with selection binding
+5. Add trash button in toolbar with count badge when items selected
+6. Batch delete with confirmation dialog
+
+### TASK-11.7: Auto Focus Message Input
+**File**: `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Views/ChatView.swift`
+
+**Implementation**:
+1. Add `@FocusState private var isInputFocused: Bool`
+2. Apply `.focused($isInputFocused)` to the TextField in inputBarView
+3. Set `isInputFocused = true` in `.task` after viewModel initialization
+4. Only focus if not streaming
+
+### TASK-11.8: Auto Scroll to Recent Messages
+**File**: `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Views/ChatView.swift`
+
+**Implementation**:
+1. Current implementation already auto-scrolls on new messages
+2. Add scroll position detection using GeometryReader
+3. Implement pagination trigger when scrolled to top
+4. Add message batch loading (e.g., 50 messages per page)
+5. Keep existing auto-scroll to bottom behavior
+
+### TASK-11.9: Limit Model List Display
+**File**: `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Components/ModelSwitcher.swift`
+
+**Implementation**:
+1. Create helper function `limitedModels(for provider: ProviderConfig) -> [ModelInfo]`
+2. Sort models by version/date (newest first), limit to 3
+3. Add "Show all" button/section that expands the list
+4. Store expanded state per-provider in UserDefaults
+5. Apply to ModelPickerSheet, ModelPickerMenuContent, ModelPickerPopover
+
+---
+
+## Core Agent Tasks (3 tasks) - DISPATCHED
+
+### TASK-11.5: Ollama Cloud Configuration
+**Files**:
+- `/Users/z/Projects/OmniChat/OmniChat/Core/Provider/Adapters/OllamaAdapter.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Features/Settings/Views/ProviderSetupView.swift`
+
+**Reference**: https://docs.ollama.com/cloud
+
+**Implementation**:
+
+1. **OllamaAdapter changes**:
+   - Add optional `apiKey` parameter to init
+   - If apiKey is provided, add `Authorization: Bearer <api_key>` header to requests
+   - Keep existing local (no auth) behavior as default when no API key
+
+2. **ProviderSetupView changes**:
+   - For `.ollama` type, show URL field (allow any URL, not just localhost)
+   - Add optional API key field - show when URL is not localhost/127.0.0.1
+   - Add info text: "For cloud-hosted Ollama, enter your API key"
+   - Validate: If URL contains cloud/production domain, require API key
+
+3. **ProviderConfig** (check if changes needed):
+   - Ensure `authMethod` can be `.bearer` for Ollama cloud
+
+### TASK-11.6: Usage Monitor in Conversation
+**Files**:
+- `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/ViewModels/ChatViewModel.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Views/ChatView.swift`
+- NEW: `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Components/UsageMonitorView.swift`
+
+**Reference**: https://github.com/openclaw/openclaw/tree/main/src/infra (provider-usage.fetch.*.ts)
+
+**Implementation**:
+
+1. **Create UsageMonitorView.swift**:
+   ```swift
+   struct UsageMonitorView: View {
+       let inputTokens: Int
+       let outputTokens: Int
+       let estimatedCost: Double
+       // Display: "1.2K in / 456 out | $0.02"
+   }
+   ```
+
+2. **ChatViewModel changes**:
+   - Add `@Published var currentInputTokens: Int = 0`
+   - Add `@Published var currentOutputTokens: Int = 0`
+   - Update from StreamEvent.inputTokenCount/outputTokenCount
+   - Reset when starting new message
+   - Add `var currentUsageCost: Double` using CostCalculator
+
+3. **ChatView changes**:
+   - Add UsageMonitorView above inputBarView
+   - Show when tokens > 0 or isStreaming
+   - Pass token counts from viewModel
+
+### TASK-11.10: Z.AI Anthropic Usage Fix
+**Files**:
+- `/Users/z/Projects/OmniChat/OmniChat/Core/Data/CostCalculator.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/ViewModels/ChatViewModel.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Core/Provider/Adapters/ZhipuAdapter.swift`
+
+**Context**: Z.AI (zhipu) uses GLM models via fixed subscription, not per-token billing.
+
+**Implementation**:
+
+1. **CostCalculator changes**:
+   - Add method: `static func shouldSkipCostCalculation(for providerType: ProviderType) -> Bool`
+   - Return `true` for `.zhipu`, `.zhipuCoding`, `.zhipuAnthropic`
+   - These providers should use `.free` pricing
+
+2. **ChatViewModel changes**:
+   - Before recording UsageRecord, check if provider should skip cost
+   - Still track token counts but set cost to 0 for subscription providers
+
+3. **ZhipuAdapter changes**:
+   - Update defaultModels to have `inputTokenCost: nil, outputTokenCost: nil`
 
 ---
 
@@ -146,21 +236,22 @@ None currently.
 - `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Views/MessageInputBar.swift`
 - `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/Components/ModelSwitcher.swift`
 - `/Users/z/Projects/OmniChat/OmniChat/Features/Settings/Views/ProviderListView.swift`
-- `/Users/z/Projects/OmniChat/OmniChat/Features/ConversationList/Views/ConversationListView.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Features/Personas/Views/PersonaPicker.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Core/Data/Models/Conversation.swift`
 
 ### Core Agent Files:
 - `/Users/z/Projects/OmniChat/OmniChat/Core/Data/Models/Conversation.swift`
 - `/Users/z/Projects/OmniChat/OmniChat/Core/Provider/Adapters/OllamaAdapter.swift`
 - `/Users/z/Projects/OmniChat/OmniChat/Core/Provider/Adapters/ZhipuAdapter.swift`
 - `/Users/z/Projects/OmniChat/OmniChat/Features/Settings/Views/ProviderSetupView.swift`
-- `/Users/z/Projects/OmniChat/OmniChat/Core/Provider/Models/TokenUsage.swift`
-- `/Users/z/Projects/OmniChat/OmniChat/Core/Provider/CostCalculator.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Core/Data/CostCalculator.swift`
+- `/Users/z/Projects/OmniChat/OmniChat/Features/Chat/ViewModels/ChatViewModel.swift`
 
 ---
 
 ## Recent Enhancements (Phase 10 and earlier)
 
-### Conversation Management Features — Added 2026-02-22
+### Conversation Management Features - Added 2026-02-22
 
 | Feature | File | Description |
 |---------|------|-------------|
@@ -172,7 +263,7 @@ None currently.
 
 ---
 
-## Z.AI Provider Addition — Added 2026-02-22
+## Z.AI Provider Addition - Added 2026-02-22
 
 | Component | File | Description |
 |-----------|------|-------------|
