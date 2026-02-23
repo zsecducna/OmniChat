@@ -9,6 +9,7 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 /// Main chat interface displaying a conversation's messages.
 ///
@@ -213,6 +214,20 @@ struct ChatView: View {
             // Update local error state when view model error changes
             if let error = newError {
                 currentError = error
+            }
+        }
+        .onChange(of: conversation.personaID) { oldValue, newValue in
+            // Log and persist personaID changes
+            Logger(subsystem: Constants.BundleID.base, category: "ChatView")
+                .debug("PersonaID changed from \(oldValue?.uuidString ?? "nil") to \(newValue?.uuidString ?? "nil")")
+            conversation.touch()
+            do {
+                try modelContext.save()
+                Logger(subsystem: Constants.BundleID.base, category: "ChatView")
+                    .debug("Successfully saved personaID change")
+            } catch {
+                Logger(subsystem: Constants.BundleID.base, category: "ChatView")
+                    .error("Failed to save personaID change: \(error.localizedDescription)")
             }
         }
     }
@@ -460,6 +475,8 @@ struct ChatView: View {
         case .openai: return "cpu"
         case .ollama: return "terminal"
         case .zhipu: return "sparkles"
+        case .zhipuCoding: return "chevron.left.forwardslash.chevron.right"
+        case .zhipuAnthropic: return "brain"
         case .groq: return "bolt"
         case .cerebras: return "flame"
         case .mistral: return "wind"
@@ -481,6 +498,8 @@ struct ChatView: View {
         case .openai: return Theme.Colors.openaiAccent
         case .ollama: return Theme.Colors.ollamaAccent
         case .zhipu: return Theme.Colors.zhipuAccent
+        case .zhipuCoding: return Theme.Colors.zhipuAccent
+        case .zhipuAnthropic: return Theme.Colors.anthropicAccent
         case .groq: return Theme.Colors.groqAccent
         case .cerebras: return Theme.Colors.cerebrasAccent
         case .mistral: return Theme.Colors.mistralAccent

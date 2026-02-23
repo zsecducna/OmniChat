@@ -179,6 +179,8 @@ struct ProviderListView: View {
             case .openai: return "cpu"
             case .ollama: return "desktopcomputer"
             case .zhipu: return "sparkles"
+            case .zhipuCoding: return "chevron.left.forwardslash.chevron.right"
+            case .zhipuAnthropic: return "brain"
             case .groq: return "bolt"
             case .cerebras: return "flame"
             case .mistral: return "wind"
@@ -201,6 +203,8 @@ struct ProviderListView: View {
             case .openai: return Theme.Colors.openaiAccent
             case .ollama: return Theme.Colors.ollamaAccent
             case .zhipu: return Theme.Colors.zhipuAccent
+            case .zhipuCoding: return Theme.Colors.zhipuAccent
+            case .zhipuAnthropic: return Theme.Colors.anthropicAccent
             case .groq: return Theme.Colors.groqAccent
             case .cerebras: return Theme.Colors.cerebrasAccent
             case .mistral: return Theme.Colors.mistralAccent
@@ -303,6 +307,8 @@ extension ProviderType {
         case .openai: return "OpenAI GPT"
         case .ollama: return "Ollama (Local)"
         case .zhipu: return "Z.AI (ZhipuAI)"
+        case .zhipuCoding: return "Z.AI Coding"
+        case .zhipuAnthropic: return "Z.AI (Anthropic)"
         case .groq: return "Groq (Fast Inference)"
         case .cerebras: return "Cerebras (Ultra-Fast)"
         case .mistral: return "Mistral AI"

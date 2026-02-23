@@ -733,7 +733,8 @@ TASK-0.1: Create Xcode Project
   - New Xcode project: "OmniChat"
   - Template: Multiplatform App (SwiftUI)
   - Deployment targets: iOS 17, macOS 14
-  - Bundle ID: com.yourname.omnichat
+  - Bundle ID: com.zsec.omnichat
+  - Apple Developer Team ID: BX5MBA458R
   - Enable iCloud capability (CloudKit + Key-value storage)
   - Enable Keychain Sharing capability
   - Team & signing configuration
@@ -1052,7 +1053,7 @@ TASK-5.4: Integrate Personas into Chat Flow
 ```
 TASK-6.1: Configure CloudKit Container
   - In Xcode capabilities: enable CloudKit
-  - Container identifier: iCloud.com.yourname.omnichat
+  - Container identifier: iCloud.com.zsec.omnichat
   - SwiftData ModelConfiguration with cloudKitDatabase: .automatic
   - Test sync between two devices
 

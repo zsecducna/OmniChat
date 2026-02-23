@@ -48,10 +48,10 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         case .ollama:
             // Ollama doesn't need the advanced step (base URL is in auth)
             return [.type, .auth, .model]
-        case .anthropic, .openai, .zhipu:
+        case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             // Built-in providers don't need advanced step
             return [.type, .auth, .model]
-        case .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             // OpenAI-compatible providers: include advanced for optional base URL override
             return [.type, .auth, .model, .advanced]
@@ -202,15 +202,6 @@ struct ProviderSetupView: View {
                         .disabled(!canProceed)
                     }
                 }
-                .safeAreaInset(edge: .top) {
-                    VStack(spacing: 0) {
-                        stepIndicator
-                            .padding(.vertical, Theme.Spacing.medium.rawValue)
-                            .background(.ultraThinMaterial)
-
-                        Divider()
-                    }
-                }
                 .onAppear {
                     if let provider = provider {
                         loadProviderData(provider)
@@ -220,54 +211,6 @@ struct ProviderSetupView: View {
         #if os(iOS)
         .presentationDetents([.large])
         #endif
-    }
-
-    // MARK: - Step Indicator
-
-    private var stepIndicator: some View {
-        HStack(spacing: Theme.Spacing.small.rawValue) {
-            ForEach(SetupStep.steps(for: providerType)) { step in
-                stepIndicatorItem(for: step)
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.large.rawValue)
-    }
-
-    private func stepIndicatorItem(for step: SetupStep) -> some View {
-        let steps = applicableSteps
-        let isLast = step == steps.last
-        let stepIdx = steps.firstIndex(of: step) ?? 0
-        let currentIdx = steps.firstIndex(of: currentStep) ?? 0
-
-        return HStack(spacing: Theme.Spacing.tight.rawValue) {
-            ZStack {
-                Circle()
-                    .fill(stepIdx <= currentIdx
-                          ? AnyShapeStyle(Theme.Colors.accent)
-                          : AnyShapeStyle(Theme.Colors.tertiaryBackground))
-                    .frame(width: 24, height: 24)
-
-                if stepIdx < currentIdx {
-                    Image(systemName: "checkmark")
-                        .font(.caption2)
-                        .foregroundColor(.white)
-                } else {
-                    Text("\(stepIdx + 1)")
-                        .font(.caption2)
-                        .foregroundColor(stepIdx == currentIdx
-                                         ? .white
-                                         : Theme.Colors.tertiaryText.resolve(in: colorScheme))
-                }
-            }
-
-            if !isLast {
-                Rectangle()
-                    .fill(stepIdx < currentIdx
-                          ? AnyShapeStyle(Theme.Colors.accent)
-                          : AnyShapeStyle(Theme.Colors.border))
-                    .frame(width: 20, height: 2)
-            }
-        }
     }
 
     private func stepIndex(for step: SetupStep) -> Int {
@@ -369,7 +312,7 @@ struct ProviderSetupView: View {
             }
 
             switch providerType {
-            case .anthropic, .openai, .zhipu:
+            case .anthropic, .openai, .zhipu, .zhipuAnthropic:
                 switch selectedAuthMethod {
                 case .apiKey:
                     apiKeySection
@@ -385,7 +328,7 @@ struct ProviderSetupView: View {
                 ollamaConfigurationSection
 
             // OpenAI-compatible providers - use same auth flow as OpenAI
-            case .groq, .cerebras, .mistral, .deepSeek, .together,
+            case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
                  .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                 openAICompatibleAuthSection
 
@@ -613,13 +556,13 @@ struct ProviderSetupView: View {
     /// Whether the OAuth configuration is valid for starting a flow.
     private var oauthConfigIsValid: Bool {
         switch providerType {
-        case .anthropic, .openai, .zhipu:
+        case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             // Built-in providers have hardcoded OAuth configs
             return true
         case .custom:
             // Custom providers need user-provided config
             return !oauthClientID.isEmpty && !oauthAuthURL.isEmpty && !oauthTokenURL.isEmpty
-        case .ollama, .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .ollama, .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             return false
         }
@@ -1253,7 +1196,7 @@ struct ProviderSetupView: View {
 
     private var canProceedFromAuthStep: Bool {
         switch providerType {
-        case .anthropic, .openai, .zhipu:
+        case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             switch selectedAuthMethod {
             case .apiKey:
                 return isValidated
@@ -1265,7 +1208,7 @@ struct ProviderSetupView: View {
         case .ollama:
             // For Ollama, we just need a non-empty base URL or accept the default
             return true
-        case .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             // OpenAI-compatible providers need API key validation
             return isValidated
@@ -1287,12 +1230,12 @@ struct ProviderSetupView: View {
         switch providerType {
         case .custom:
             return true
-        case .anthropic, .openai, .zhipu:
+        case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             // Future-proof: these may support OAuth in the future
             return false
         case .ollama:
             return false
-        case .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             // OpenAI-compatible providers typically use API keys
             return false
@@ -1302,11 +1245,11 @@ struct ProviderSetupView: View {
     /// Available authentication methods for the current provider type.
     private var availableAuthMethods: [AuthMethod] {
         switch providerType {
-        case .anthropic, .openai, .zhipu:
+        case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             return [.apiKey]
         case .ollama:
             return [.none]
-        case .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             // OpenAI-compatible providers use API keys
             return [.apiKey]
@@ -1561,7 +1504,7 @@ struct ProviderSetupView: View {
         case .apiKey:
             // Load API key from Keychain
             switch providerType {
-            case .anthropic, .openai, .zhipu, .custom,
+            case .anthropic, .openai, .zhipu, .zhipuCoding, .zhipuAnthropic, .custom,
                  .groq, .cerebras, .mistral, .deepSeek, .together,
                  .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                 if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
@@ -1831,7 +1774,7 @@ struct ProviderSetupView: View {
                 )
 
                 switch providerType {
-                case .anthropic, .openai, .zhipu:
+                case .anthropic, .openai, .zhipu, .zhipuAnthropic:
                     let adapter = try getAdapter(for: tempConfig, apiKey: apiKey)
                     logger.debug("Calling adapter.fetchModels() for \(self.providerType.rawValue)")
                     let models = try await adapter.fetchModels()
@@ -1845,7 +1788,7 @@ struct ProviderSetupView: View {
                         }
                     }
 
-                case .groq, .cerebras, .mistral, .deepSeek, .together,
+                case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
                      .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                     // OpenAI-compatible providers - try to fetch models
                     logger.debug("Fetching models from \(self.providerType.rawValue) (OpenAI-compatible)")
@@ -2023,11 +1966,11 @@ struct ProviderSetupView: View {
         // Determine auth method based on provider type and selection
         let authMethod: AuthMethod
         switch providerType {
-        case .anthropic, .openai, .zhipu:
+        case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             authMethod = selectedAuthMethod == .oauth ? .oauth : .apiKey
         case .ollama:
             authMethod = .none
-        case .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             authMethod = .apiKey
         case .custom:
@@ -2205,6 +2148,12 @@ struct ProviderSetupView: View {
             return try OpenAIAdapter(config: config, apiKey: apiKey)
         case .zhipu:
             return try ZhipuAdapter(config: config, apiKey: apiKey)
+        case .zhipuCoding:
+            // Z.AI Coding uses the same ZhipuAdapter
+            return try ZhipuAdapter(config: config, apiKey: apiKey)
+        case .zhipuAnthropic:
+            // Z.AI Anthropic uses Anthropic API format
+            return AnthropicAdapter(config: config, apiKey: apiKey)
         case .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             // OpenAI-compatible providers use OpenAIAdapter
@@ -2247,6 +2196,19 @@ struct ProviderSetupView: View {
             return [
                 ModelInfo(id: "glm-5", displayName: "GLM-5", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
                 ModelInfo(id: "glm-4.7", displayName: "GLM-4.7", contextWindow: 128000, supportsVision: true, supportsStreaming: true)
+            ]
+        case .zhipuCoding:
+            // Z.AI Coding models (OpenAI-compatible)
+            return [
+                ModelInfo(id: "glm-5", displayName: "GLM-5", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "glm-4.7", displayName: "GLM-4.7", contextWindow: 128000, supportsVision: true, supportsStreaming: true)
+            ]
+        case .zhipuAnthropic:
+            // Z.AI Anthropic-compatible models
+            return [
+                ModelInfo(id: "claude-sonnet-4-5-20250929", displayName: "Claude Sonnet 4.5", contextWindow: 200000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "claude-3-5-sonnet-20241022", displayName: "Claude 3.5 Sonnet", contextWindow: 200000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "claude-3-opus-20240229", displayName: "Claude 3 Opus", contextWindow: 200000, supportsVision: true, supportsStreaming: true)
             ]
         case .groq:
             // Groq - fast inference
@@ -2337,6 +2299,8 @@ struct ProviderSetupView: View {
         case .openai: return "cpu"
         case .ollama: return "terminal"
         case .zhipu: return "sparkles"
+        case .zhipuCoding: return "chevron.left.forwardslash.chevron.right"
+        case .zhipuAnthropic: return "brain"
         case .groq: return "bolt"
         case .cerebras: return "flame"
         case .mistral: return "wind"
@@ -2358,6 +2322,8 @@ struct ProviderSetupView: View {
         case .openai: return Theme.Colors.openaiAccent
         case .ollama: return Theme.Colors.ollamaAccent
         case .zhipu: return Theme.Colors.zhipuAccent
+        case .zhipuCoding: return Theme.Colors.zhipuAccent
+        case .zhipuAnthropic: return Theme.Colors.anthropicAccent
         case .groq: return Theme.Colors.groqAccent
         case .cerebras: return Theme.Colors.cerebrasAccent
         case .mistral: return Theme.Colors.mistralAccent

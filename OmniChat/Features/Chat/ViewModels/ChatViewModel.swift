@@ -489,7 +489,13 @@ final class ChatViewModel {
     ///
     /// - Returns: The system prompt to use, or nil if none is configured.
     private func resolveSystemPrompt() -> String? {
-        guard let conversation = currentConversation else { return nil }
+        guard let conversation = currentConversation else {
+            Self.logger.debug("resolveSystemPrompt: No current conversation")
+            return nil
+        }
+
+        Self.logger.debug("resolveSystemPrompt: Conversation ID = \(conversation.id.uuidString)")
+        Self.logger.debug("resolveSystemPrompt: personaID = \(conversation.personaID?.uuidString ?? "nil")")
 
         // If conversation has a personaID, try to fetch the persona
         if let personaID = conversation.personaID {
@@ -497,7 +503,7 @@ final class ChatViewModel {
                 // Use persona's system prompt (may be empty for "Default" persona)
                 let prompt = persona.systemPrompt
                 if !prompt.isEmpty {
-                    Self.logger.debug("Using system prompt from persona: \(persona.name)")
+                    Self.logger.debug("Using system prompt from persona: \(persona.name), length: \(prompt.count)")
                     return prompt
                 } else {
                     Self.logger.debug("Persona '\(persona.name)' has empty system prompt, skipping")
@@ -515,6 +521,7 @@ final class ChatViewModel {
             return systemPrompt
         }
 
+        Self.logger.debug("resolveSystemPrompt: No system prompt found, returning nil")
         return nil
     }
 

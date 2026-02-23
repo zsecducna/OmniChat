@@ -40,13 +40,22 @@ struct ContentView: View {
     /// Navigation path for iPhone push navigation.
     @State private var navigationPath = NavigationPath()
 
+    /// Column visibility for NavigationSplitView (controls iPhone navigation).
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
     // MARK: - Body
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
             detailView
+        }
+        .onChange(of: selectedConversation) { _, newValue in
+            // On iPhone, show the detail column when a conversation is selected
+            if newValue != nil {
+                columnVisibility = .detailOnly
+            }
         }
     }
 
@@ -119,6 +128,9 @@ struct ContentView: View {
 
             modelContext.insert(conversation)
             selectedConversation = conversation
+
+            // On iPhone, show the detail column after creating a new conversation
+            columnVisibility = .detailOnly
         }
     }
 }
