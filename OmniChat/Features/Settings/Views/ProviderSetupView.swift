@@ -147,6 +147,12 @@ struct ProviderSetupView: View {
         case success
         case failure(String)
 
+        /// Returns true if the connection test was successful.
+        var isSuccess: Bool {
+            if case .success = self { return true }
+            return false
+        }
+
         static func == (lhs: ConnectionTestResult, rhs: ConnectionTestResult) -> Bool {
             switch (lhs, rhs) {
             case (.success, .success):
@@ -971,6 +977,15 @@ struct ProviderSetupView: View {
 
     // MARK: - Ollama Configuration Section
 
+    /// Returns whether the current Ollama URL is for a cloud instance.
+    /// Cloud instances require API key authentication.
+    private var isOllamaCloudInstance: Bool {
+        let url = baseURL.lowercased()
+        // Check if URL is not localhost or 127.0.0.1
+        let isLocalhost = url.contains("localhost") || url.contains("127.0.0.1") || url.isEmpty
+        return !isLocalhost
+    }
+
     @ViewBuilder
     private var ollamaConfigurationSection: some View {
         Section {
@@ -984,7 +999,27 @@ struct ProviderSetupView: View {
         } header: {
             Text("Server URL")
         } footer: {
-            Text("Default: http://localhost:11434 - Ollama runs locally without authentication")
+            if isOllamaCloudInstance {
+                Text("Cloud-hosted Ollama requires an API key for authentication")
+            } else {
+                Text("Default: http://localhost:11434 - Local Ollama runs without authentication")
+            }
+        }
+
+        // API Key for cloud-hosted Ollama
+        if isOllamaCloudInstance {
+            Section {
+                SecureField("API Key", text: $apiKey)
+                    .textContentType(.password)
+                    #if os(iOS)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("Authentication")
+            } footer: {
+                Text("Enter your Ollama Cloud API key for authentication")
+            }
         }
 
         Section {
@@ -1001,7 +1036,7 @@ struct ProviderSetupView: View {
                     }
                 }
             }
-            .disabled(isTestingConnection)
+            .disabled(isTestingConnection || (isOllamaCloudInstance && apiKey.isEmpty))
 
             if let result = connectionTestResult {
                 switch result {
@@ -1018,13 +1053,23 @@ struct ProviderSetupView: View {
         } header: {
             Text("Connection")
         } footer: {
-            Text("Make sure Ollama is running on your machine before testing")
+            if isOllamaCloudInstance {
+                Text("Test your cloud Ollama connection with the provided API key")
+            } else {
+                Text("Make sure Ollama is running on your machine before testing")
+            }
         }
 
         Section {
-            Text("Ollama is a local LLM server that runs entirely on your machine. No API key or authentication is required.")
-                .font(Theme.Typography.caption)
-                .foregroundStyle(Theme.Colors.secondaryText)
+            if isOllamaCloudInstance {
+                Text("Ollama Cloud is a hosted version of Ollama. Enter your server URL and API key to connect.")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.secondaryText)
+            } else {
+                Text("Ollama is a local LLM server that runs entirely on your machine. No API key or authentication is required for local instances.")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.secondaryText)
+            }
         } header: {
             Text("About Ollama")
         }
@@ -1206,7 +1251,11 @@ struct ProviderSetupView: View {
                 return isValidated
             }
         case .ollama:
-            // For Ollama, we just need a non-empty base URL or accept the default
+            // For local Ollama, no auth is needed
+            // For cloud Ollama, API key is required
+            if isOllamaCloudInstance {
+                return !apiKey.isEmpty && connectionTestResult?.isSuccess == true
+            }
             return true
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
@@ -1618,8 +1667,25 @@ struct ProviderSetupView: View {
         Task {
             do {
                 // Try to fetch models from Ollama
-                let url = URL(string: "\(effectiveURL)/api/tags")!
-                let (_, response) = try await URLSession.shared.data(from: url)
+                guard let url = URL(string: "\(effectiveURL)/api/tags") else {
+                    await MainActor.run {
+                        isTestingConnection = false
+                        connectionTestResult = .failure("Invalid URL")
+                    }
+                    return
+                }
+
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                // Add Bearer token for cloud-hosted Ollama instances
+                let isCloud = isOllamaCloudInstance
+                if isCloud, !apiKey.isEmpty {
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                }
+
+                let (_, response) = try await URLSession.shared.data(for: request)
 
                 if let httpResponse = response as? HTTPURLResponse {
                     await MainActor.run {
@@ -1630,6 +1696,8 @@ struct ProviderSetupView: View {
                             if baseURL.trimmingCharacters(in: .whitespaces).isEmpty {
                                 baseURL = effectiveURL
                             }
+                        } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                            connectionTestResult = .failure("Authentication failed. Check your API key.")
                         } else {
                             connectionTestResult = .failure("Server returned status \(httpResponse.statusCode)")
                         }
@@ -1862,11 +1930,27 @@ struct ProviderSetupView: View {
     // MARK: - Fetch Ollama Models
 
     private func fetchOllamaModels(baseURL: String) async throws -> [ModelInfo] {
-        let url = URL(string: "\(baseURL)/api/tags")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let url = URL(string: "\(baseURL)/api/tags") else {
+            throw ProviderError.invalidResponse("Invalid Ollama URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Add Bearer token for cloud-hosted Ollama instances
+        let isCloud = isOllamaCloudInstance
+        if isCloud, !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if statusCode == 401 || statusCode == 403 {
+                throw ProviderError.unauthorized
+            }
             throw ProviderError.serverError(statusCode: statusCode, message: "Failed to fetch models from Ollama")
         }
 

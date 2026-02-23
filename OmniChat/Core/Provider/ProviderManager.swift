@@ -173,9 +173,14 @@ final class ProviderManager {
             Self.logger.debug("Created OpenAI adapter for '\(config.name)'")
 
         case .ollama:
-            // Ollama does not require authentication
-            adapter = OllamaAdapter(config: snapshot)
-            Self.logger.debug("Created Ollama adapter for '\(config.name)'")
+            // Ollama supports optional authentication for cloud-hosted instances
+            // Local Ollama does not require authentication, but cloud Ollama does
+            adapter = OllamaAdapter(config: snapshot, apiKey: apiKey.isEmpty ? nil : apiKey)
+            if apiKey.isEmpty {
+                Self.logger.debug("Created Ollama adapter for '\(config.name)' (local, no auth)")
+            } else {
+                Self.logger.debug("Created Ollama adapter for '\(config.name)' (cloud with auth)")
+            }
 
         case .zhipu:
             adapter = try ZhipuAdapter(config: snapshot, apiKey: apiKey)

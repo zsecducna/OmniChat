@@ -430,6 +430,9 @@ final class ZhipuAdapter: AIProvider, Sendable {
     // MARK: - Default Models
 
     /// Default models for Z.AI when fetch fails.
+    ///
+    /// Z.AI uses GLM models via fixed subscription, not per-token billing.
+    /// Token costs are set to nil to indicate subscription-based pricing.
     private var defaultModels: [ModelInfo] {
         [
             ModelInfo(
@@ -438,8 +441,8 @@ final class ZhipuAdapter: AIProvider, Sendable {
                 contextWindow: 128_000,
                 supportsVision: true,
                 supportsStreaming: true,
-                inputTokenCost: 0.50,
-                outputTokenCost: 0.50
+                inputTokenCost: nil,
+                outputTokenCost: nil
             ),
             ModelInfo(
                 id: "glm-4.7",
@@ -447,8 +450,8 @@ final class ZhipuAdapter: AIProvider, Sendable {
                 contextWindow: 128_000,
                 supportsVision: true,
                 supportsStreaming: true,
-                inputTokenCost: 0.50,
-                outputTokenCost: 0.50
+                inputTokenCost: nil,
+                outputTokenCost: nil
             )
         ]
     }

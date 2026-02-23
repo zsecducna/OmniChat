@@ -64,6 +64,8 @@ struct ChatView: View {
 
     @State private var inputText = ""
     @State private var isLoadingOlder = false
+    @FocusState private var isInputFocused: Bool
+    @State private var hasScrolledToBottom = false
 
     // MARK: - Constants
 
@@ -155,6 +157,9 @@ struct ChatView: View {
             // Message list
             messageListView
 
+            // Usage monitor (shown during/after streaming)
+            usageMonitorView
+
             // Input bar (or provider setup prompt if no provider)
             if currentProvider != nil {
                 inputBarView
@@ -209,6 +214,18 @@ struct ChatView: View {
                 viewModel = ChatViewModel(modelContext: modelContext, providerManager: manager)
                 viewModel?.currentConversation = conversation
             }
+            // Restore draft message if exists
+            if let draft = conversation.draftMessage, !draft.isEmpty {
+                inputText = draft
+            }
+            // Auto-focus input when conversation opens (only if not streaming)
+            if viewModel?.isStreaming != true {
+                isInputFocused = true
+            }
+        }
+        .onDisappear {
+            // Save draft message when leaving the conversation
+            saveDraftMessage()
         }
         .onChange(of: viewModel?.error) { _, newError in
             // Update local error state when view model error changes
@@ -273,6 +290,17 @@ struct ChatView: View {
                 if streaming == true {
                     withAnimation(.easeInOut(duration: Theme.Animation.default)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: messages) { _, newMessages in
+                // Scroll to bottom on initial load when messages exist
+                if !newMessages.isEmpty && !hasScrolledToBottom {
+                    hasScrolledToBottom = true
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: Theme.Animation.default)) {
+                            proxy.scrollTo("bottom", anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -390,14 +418,6 @@ struct ChatView: View {
             Label("Start a Conversation", systemImage: "bubble.left.and.bubble.right")
         } description: {
             Text("Send a message to begin chatting")
-        } actions: {
-            Button {
-                // Focus input - will be connected in TASK-2.5
-            } label: {
-                Text("Send a message")
-                    .font(Theme.Typography.body)
-            }
-            .buttonStyle(.borderedProminent)
         }
         .offset(y: -40) // Shift up slightly for better visual balance
         .accessibilityElement(children: .combine)
@@ -511,6 +531,30 @@ struct ChatView: View {
         }
     }
 
+    // MARK: - Usage Monitor View
+
+    /// Displays real-time token usage during and after streaming.
+    @ViewBuilder
+    private var usageMonitorView: some View {
+        // Show when streaming or when there are tokens from the last response
+        if let vm = viewModel, (vm.isStreaming || vm.currentInputTokens > 0 || vm.currentOutputTokens > 0) {
+            HStack {
+                Spacer()
+                UsageMonitorView(
+                    inputTokens: vm.currentInputTokens,
+                    outputTokens: vm.currentOutputTokens,
+                    estimatedCost: vm.currentUsageCost,
+                    isStreaming: vm.isStreaming
+                )
+                Spacer()
+            }
+            .padding(.horizontal, Theme.Spacing.medium.rawValue)
+            .padding(.vertical, Theme.Spacing.tight.rawValue)
+            .background(Theme.Colors.secondaryBackground)
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
+        }
+    }
+
     // MARK: - Input Bar View
 
     private var inputBarView: some View {
@@ -538,6 +582,7 @@ struct ChatView: View {
                     .font(Theme.Typography.body)
                     .lineLimit(1...6)
                     .disabled(viewModel?.isStreaming == true)
+                    .focused($isInputFocused)
                     .onSubmit {
                         #if os(macOS)
                         // On macOS, Enter sends, Shift+Enter adds newline
@@ -651,8 +696,9 @@ struct ChatView: View {
         // Clear any existing error
         currentError = nil
 
-        // Clear input
+        // Clear input and draft
         inputText = ""
+        clearDraftMessage()
 
         // Send via view model (creates user message, streams AI response, creates assistant message)
         Task {
@@ -675,6 +721,23 @@ struct ChatView: View {
     private func deleteConversation() {
         modelContext.delete(conversation)
         dismiss()
+    }
+
+    /// Saves the current input text as a draft message.
+    private func saveDraftMessage() {
+        let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedText.isEmpty {
+            conversation.draftMessage = nil
+        } else {
+            conversation.draftMessage = trimmedText
+        }
+        conversation.touch()
+    }
+
+    /// Clears the draft message after successful send.
+    private func clearDraftMessage() {
+        conversation.draftMessage = nil
+        conversation.touch()
     }
 
     // MARK: - Haptic Feedback
