@@ -270,6 +270,15 @@ final class ChatViewModel {
             conversation: conversation
         )
         modelContext.insert(userMessage)
+
+        // Explicitly add to conversation's messages array to ensure it's included
+        // SwiftData relationships may not update immediately after insert
+        if conversation.messages == nil {
+            conversation.messages = [userMessage]
+        } else {
+            conversation.messages?.append(userMessage)
+        }
+
         conversation.updatedAt = Date()
 
         Self.logger.debug("User message created: \(trimmedText.prefix(50))...")
@@ -490,12 +499,8 @@ final class ChatViewModel {
     /// - Returns: The system prompt to use, or nil if none is configured.
     private func resolveSystemPrompt() -> String? {
         guard let conversation = currentConversation else {
-            Self.logger.debug("resolveSystemPrompt: No current conversation")
             return nil
         }
-
-        Self.logger.debug("resolveSystemPrompt: Conversation ID = \(conversation.id.uuidString)")
-        Self.logger.debug("resolveSystemPrompt: personaID = \(conversation.personaID?.uuidString ?? "nil")")
 
         // If conversation has a personaID, try to fetch the persona
         if let personaID = conversation.personaID {
@@ -503,10 +508,8 @@ final class ChatViewModel {
                 // Use persona's system prompt (may be empty for "Default" persona)
                 let prompt = persona.systemPrompt
                 if !prompt.isEmpty {
-                    Self.logger.debug("Using system prompt from persona: \(persona.name), length: \(prompt.count)")
                     return prompt
                 } else {
-                    Self.logger.debug("Persona '\(persona.name)' has empty system prompt, skipping")
                     return nil
                 }
             } else {
@@ -517,11 +520,9 @@ final class ChatViewModel {
 
         // Use conversation's direct system prompt if set
         if let systemPrompt = conversation.systemPrompt, !systemPrompt.isEmpty {
-            Self.logger.debug("Using conversation's direct system prompt")
             return systemPrompt
         }
 
-        Self.logger.debug("resolveSystemPrompt: No system prompt found, returning nil")
         return nil
     }
 

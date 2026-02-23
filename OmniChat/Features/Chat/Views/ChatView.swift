@@ -216,15 +216,11 @@ struct ChatView: View {
                 currentError = error
             }
         }
-        .onChange(of: conversation.personaID) { oldValue, newValue in
-            // Log and persist personaID changes
-            Logger(subsystem: Constants.BundleID.base, category: "ChatView")
-                .debug("PersonaID changed from \(oldValue?.uuidString ?? "nil") to \(newValue?.uuidString ?? "nil")")
+        .onChange(of: conversation.personaID) { _, _ in
+            // Persist personaID changes immediately
             conversation.touch()
             do {
                 try modelContext.save()
-                Logger(subsystem: Constants.BundleID.base, category: "ChatView")
-                    .debug("Successfully saved personaID change")
             } catch {
                 Logger(subsystem: Constants.BundleID.base, category: "ChatView")
                     .error("Failed to save personaID change: \(error.localizedDescription)")
