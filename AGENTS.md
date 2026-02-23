@@ -78,6 +78,12 @@ None currently.
   - ProviderSetupView shows API key field for non-localhost Ollama URLs
   - UsageMonitorView displays live token usage above input bar
   - CostCalculator.shouldSkipCostCalculation() for subscription-based providers
+- [2026-02-24] Core Agent added Kilo Code gateway as new AI provider:
+  - Added .kilo ProviderType with base URL https://api.kilo.ai
+  - Uses OpenAI-compatible format, routed through OpenAIAdapter
+  - Added kiloAccent color (indigo) to Theme
+  - Default models: GPT-4o, GPT-4o Mini, Claude Sonnet 4.5
+  - Also fixed pre-existing ChatViewModel syntax error (missing do before catch)
 
 ---
 
