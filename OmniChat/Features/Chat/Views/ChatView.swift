@@ -509,6 +509,7 @@ struct ChatView: View {
         case .xAI: return "x.square"
         case .perplexity: return "magnifyingglass"
         case .google: return "g.circle"
+        case .kilo: return "k.circle"
         case .custom: return "gearshape.2"
         }
     }
@@ -532,6 +533,7 @@ struct ChatView: View {
         case .xAI: return Theme.Colors.xAIAccent
         case .perplexity: return Theme.Colors.perplexityAccent
         case .google: return Theme.Colors.googleAccent
+        case .kilo: return Theme.Colors.kiloAccent
         case .custom: return Theme.Colors.customAccent
         }
     }

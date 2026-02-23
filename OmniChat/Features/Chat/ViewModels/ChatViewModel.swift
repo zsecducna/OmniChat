@@ -613,11 +613,12 @@ final class ChatViewModel {
         }
         // Fetch quota in background
         Task {
-            let info = await provider.fetchQuota()
-            await MainActor.run {
-                self.zaiQuotaInfo = info
-            }
-        } catch {
+            do {
+                let info = await provider.fetchQuota()
+                await MainActor.run {
+                    self.zaiQuotaInfo = info
+                }
+            } catch {
                 Self.logger.warning("Failed to fetch Z.AI quota: \(error.localizedDescription)")
                 zaiQuotaInfo = nil
             }

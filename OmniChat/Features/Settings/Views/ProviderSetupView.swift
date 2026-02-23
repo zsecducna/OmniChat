@@ -52,7 +52,7 @@ enum SetupStep: Int, CaseIterable, Identifiable {
             // Built-in providers don't need advanced step
             return [.type, .auth, .model]
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             // OpenAI-compatible providers: include advanced for optional base URL override
             return [.type, .auth, .model, .advanced]
         case .custom:
@@ -335,7 +335,7 @@ struct ProviderSetupView: View {
 
             // OpenAI-compatible providers - use same auth flow as OpenAI
             case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
                 openAICompatibleAuthSection
 
             case .custom:
@@ -569,7 +569,7 @@ struct ProviderSetupView: View {
             // Custom providers need user-provided config
             return !oauthClientID.isEmpty && !oauthAuthURL.isEmpty && !oauthTokenURL.isEmpty
         case .ollama, .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             return false
         }
     }
@@ -1258,7 +1258,7 @@ struct ProviderSetupView: View {
             }
             return true
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             // OpenAI-compatible providers need API key validation
             return isValidated
         case .custom:
@@ -1285,7 +1285,7 @@ struct ProviderSetupView: View {
         case .ollama:
             return false
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             // OpenAI-compatible providers typically use API keys
             return false
         }
@@ -1299,11 +1299,11 @@ struct ProviderSetupView: View {
         case .ollama:
             return [.none]
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             // OpenAI-compatible providers use API keys
             return [.apiKey]
         case .custom:
-            return [.apiKey, .oauth, .none]
+            return AuthMethod.allCases
         }
     }
 
@@ -1555,7 +1555,7 @@ struct ProviderSetupView: View {
             switch providerType {
             case .anthropic, .openai, .zhipu, .zhipuCoding, .zhipuAnthropic, .custom,
                  .groq, .cerebras, .mistral, .deepSeek, .together,
-                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
                 if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
                     apiKey = key
                     isValidated = true
@@ -1857,7 +1857,7 @@ struct ProviderSetupView: View {
                     }
 
                 case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-                     .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+                     .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
                     // OpenAI-compatible providers - try to fetch models
                     logger.debug("Fetching models from \(self.providerType.rawValue) (OpenAI-compatible)")
                     if let models = try? await fetchCustomProviderModels(config: tempConfig), !models.isEmpty {
@@ -2055,7 +2055,7 @@ struct ProviderSetupView: View {
         case .ollama:
             authMethod = .none
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             authMethod = .apiKey
         case .custom:
             authMethod = selectedAuthMethod
@@ -2239,7 +2239,7 @@ struct ProviderSetupView: View {
             // Z.AI Anthropic uses Anthropic API format
             return AnthropicAdapter(config: config, apiKey: apiKey)
         case .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             // OpenAI-compatible providers use OpenAIAdapter
             return try OpenAIAdapter(config: config, apiKey: apiKey)
         case .ollama, .custom:
@@ -2369,6 +2369,13 @@ struct ProviderSetupView: View {
                 ModelInfo(id: "gemini-1.5-pro", displayName: "Gemini 1.5 Pro", contextWindow: 2000000, supportsVision: true, supportsStreaming: true),
                 ModelInfo(id: "gemini-1.5-flash", displayName: "Gemini 1.5 Flash", contextWindow: 1000000, supportsVision: true, supportsStreaming: true)
             ]
+        case .kilo:
+            // Kilo Code gateway
+            return [
+                ModelInfo(id: "gpt-4o", displayName: "GPT-4o", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "gpt-4o-mini", displayName: "GPT-4o Mini", contextWindow: 128000, supportsVision: true, supportsStreaming: true),
+                ModelInfo(id: "claude-sonnet-4-5-20250929", displayName: "Claude Sonnet 4.5", contextWindow: 200000, supportsVision: true, supportsStreaming: true)
+            ]
         case .custom:
             // For custom providers, user should enter models manually or fetch from API
             return [
@@ -2396,6 +2403,7 @@ struct ProviderSetupView: View {
         case .xAI: return "x.square"
         case .perplexity: return "magnifyingglass"
         case .google: return "g.circle"
+        case .kilo: return "k.circle"
         case .custom: return "gearshape.2"
         }
     }
@@ -2419,6 +2427,7 @@ struct ProviderSetupView: View {
         case .xAI: return Theme.Colors.xAIAccent
         case .perplexity: return Theme.Colors.perplexityAccent
         case .google: return Theme.Colors.googleAccent
+        case .kilo: return Theme.Colors.kiloAccent
         case .custom: return Theme.Colors.customAccent
         }
     }

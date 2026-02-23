@@ -198,7 +198,7 @@ final class ProviderManager {
 
         // OpenAI-compatible providers - use OpenAIAdapter with custom baseURL
         case .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             adapter = try OpenAIAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created \(config.providerType.displayName) adapter (OpenAI-compatible) for '\(config.name)'")
 

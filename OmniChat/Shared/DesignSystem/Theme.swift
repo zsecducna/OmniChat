@@ -195,6 +195,9 @@ enum Theme {
         /// Google AI accent color (Google blue)
         static let googleAccent = Color(hex: "4285F4")
 
+        /// Kilo Code accent color (indigo)
+        static let kiloAccent = Color(hex: "6366F1")
+
         /// Custom provider accent color (purple)
         static let customAccent = Color(hex: "8B5CF6")
 
@@ -275,6 +278,8 @@ enum Theme {
                 return perplexityAccent
             case "google", "gemini":
                 return googleAccent
+            case "kilo", "kilocode", "kilo.ai":
+                return kiloAccent
             default:
                 return customAccent
             }

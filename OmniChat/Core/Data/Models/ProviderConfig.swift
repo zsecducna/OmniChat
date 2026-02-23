@@ -28,6 +28,7 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
     case xAI
     case perplexity
     case google
+    case kilo
     case custom
 
     /// Returns the default base URL for this provider type.
@@ -68,6 +69,8 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "https://api.perplexity.ai"
         case .google:
             return "https://generativelanguage.googleapis.com/v1beta"
+        case .kilo:
+            return "https://api.kilo.ai"
         case .custom:
             return nil
         }
@@ -111,6 +114,8 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "Perplexity"
         case .google:
             return "Google AI"
+        case .kilo:
+            return "Kilo Code"
         case .custom:
             return "Custom"
         }
@@ -122,7 +127,7 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
         case .anthropic, .ollama, .zhipuAnthropic, .custom:
             return false
         case .openai, .zhipu, .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             return true
         }
     }
