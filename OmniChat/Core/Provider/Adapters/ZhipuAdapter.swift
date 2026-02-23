@@ -225,6 +225,52 @@ final class ZhipuAdapter: AIProvider, Sendable {
         Self.logger.debug("Z.AI request cancelled")
     }
 
+    /// Fetches the current quota usage from Z.AI monitoring API.
+    ///
+    /// Z.AI uses a subscription-based model with a 5-hour rolling token limit.
+    /// This endpoint returns the current usage percentage and reset time.
+    ///
+    /// - Returns: `ZAIQuotaInfo` with token percentage and reset time, or nil if unavailable.
+    func fetchQuota() async -> ZAIQuotaInfo? {
+        // Build the quota endpoint URL
+        let baseURLString = config.effectiveBaseURL ?? Self.defaultBaseURL
+        guard let baseURL = URL(string: baseURLString),
+              let quotaURL = URL(string: "api/monitor/usage/quota/limit", relativeTo: baseURL) else {
+            Self.logger.warning("Invalid URL for quota endpoint")
+            return nil
+        }
+
+        let headers = buildHeaders()
+
+        Self.logger.debug("Fetching Z.AI quota from: \(quotaURL.absoluteString)")
+
+        do {
+            let data = try await httpClient.request(
+                url: quotaURL,
+                method: "GET",
+                headers: headers,
+                body: nil
+            )
+
+            let response = try JSONDecoder().decode(ZAIQuotaResponse.self, from: data)
+
+            Self.logger.debug("Z.AI quota fetched successfully")
+
+            // Extract token quota (5-hour window)
+            if let tokenQuota = response.data?.tokenQuota {
+                return ZAIQuotaInfo(
+                    tokenPercentage: tokenQuota.percentage,
+                    resetTime: tokenQuota.resetTime
+                )
+            }
+
+            return nil
+        } catch {
+            Self.logger.warning("Failed to fetch Z.AI quota: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     // MARK: - Private Helpers
 
     /// Builds the HTTP headers for Z.AI requests.
@@ -544,4 +590,77 @@ private struct ZhipuUsage: Decodable {
         case completionTokens = "completion_tokens"
         case totalTokens = "total_tokens"
     }
+}
+
+// MARK: - Z.AI Quota Models
+
+/// Quota information for Z.AI subscription-based providers.
+///
+/// Z.AI uses a subscription model with a 5-hour rolling token limit.
+/// This struct represents the current usage percentage and reset time.
+public struct ZAIQuotaInfo: Sendable {
+    /// The current token usage percentage (0-100).
+    public let tokenPercentage: Double
+
+    /// When the quota will reset (ISO 8601 date string or Date).
+    public let resetTime: String?
+
+    /// Creates a new quota info instance.
+    public init(tokenPercentage: Double, resetTime: String?) {
+        self.tokenPercentage = tokenPercentage
+        self.resetTime = resetTime
+    }
+
+    /// Returns the remaining percentage (100 - used).
+    public var remainingPercentage: Double {
+        100.0 - tokenPercentage
+    }
+
+    /// Formats the reset time for display.
+    /// Returns a human-readable string like "Resets in 2h 30m" or the raw date.
+    public var resetTimeDisplay: String {
+        guard let resetTime = resetTime else {
+            return "Unknown"
+        }
+
+        // Try to parse the ISO date
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        guard let date = formatter.date(from: resetTime) else {
+            return resetTime
+        }
+
+        let now = Date()
+        let interval = date.timeIntervalSince(now)
+
+        if interval <= 0 {
+            return "Resets soon"
+        }
+
+        let hours = Int(interval / 3600)
+        let minutes = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
+
+        if hours > 0 {
+            return "Resets in \(hours)h \(minutes)m"
+        } else {
+            return "Resets in \(minutes)m"
+        }
+    }
+}
+
+/// Response from the Z.AI quota monitoring endpoint.
+private struct ZAIQuotaResponse: Decodable {
+    let data: ZAIQuotaData?
+}
+
+/// Quota data from the response.
+private struct ZAIQuotaData: Decodable {
+    let tokenQuota: ZAITokenQuota?
+}
+
+/// Token quota details.
+private struct ZAITokenQuota: Decodable {
+    let percentage: Double
+    let resetTime: String?
 }

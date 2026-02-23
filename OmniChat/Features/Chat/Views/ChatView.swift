@@ -65,7 +65,8 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var isLoadingOlder = false
     @FocusState private var isInputFocused: Bool
-    @State private var hasScrolledToBottom = false
+    @State private var scrollToBottomID: UUID?
+    @State private var initialMessageCount: Int?
 
     // MARK: - Constants
 
@@ -279,10 +280,21 @@ struct ChatView: View {
                 .padding(.horizontal, Theme.Spacing.medium.rawValue)
                 .padding(.vertical, Theme.Spacing.small.rawValue)
             }
-            .onChange(of: messages.count) { oldValue, newValue in
-                // Auto-scroll to bottom on new messages
-                if newValue > oldValue {
-                    scrollToBottom(proxy: proxy)
+            .task(id: messages.count) {
+                // Scroll to bottom on initial load or when messages change
+                if let count = initialMessageCount {
+                    // Messages changed after initial load
+                    if messages.count > count {
+                        scrollToBottom(proxy: proxy)
+                    }
+                } else {
+                    // Initial load - capture count and scroll if messages exist
+                    initialMessageCount = messages.count
+                    if !messages.isEmpty {
+                        // Small delay to ensure ScrollView is laid out
+                        try? await Task.sleep(for: .milliseconds(100))
+                        scrollToBottom(proxy: proxy)
+                    }
                 }
             }
             .onChange(of: viewModel?.isStreaming) { _, streaming in
@@ -293,16 +305,9 @@ struct ChatView: View {
                     }
                 }
             }
-            .onChange(of: messages) { _, newMessages in
-                // Scroll to bottom on initial load when messages exist
-                if !newMessages.isEmpty && !hasScrolledToBottom {
-                    hasScrolledToBottom = true
-                    DispatchQueue.main.async {
-                        withAnimation(.easeInOut(duration: Theme.Animation.default)) {
-                            proxy.scrollTo("bottom", anchor: .bottom)
-                        }
-                    }
-                }
+            .onChange(of: scrollToBottomID) { _, _ in
+                // External trigger to scroll to bottom
+                scrollToBottom(proxy: proxy)
             }
         }
         .background(Theme.Colors.background)
@@ -699,6 +704,12 @@ struct ChatView: View {
         // Clear input and draft
         inputText = ""
         clearDraftMessage()
+
+        // Reset initial message count so scroll triggers on new message
+        initialMessageCount = nil
+
+        // Trigger scroll to bottom for the user message
+        scrollToBottomID = UUID()
 
         // Send via view model (creates user message, streams AI response, creates assistant message)
         Task {
