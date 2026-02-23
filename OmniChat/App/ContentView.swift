@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 /// Root view providing NavigationSplitView-based navigation.
 ///
@@ -40,13 +41,41 @@ struct ContentView: View {
     /// Navigation path for iPhone push navigation.
     @State private var navigationPath = NavigationPath()
 
+    /// Column visibility for NavigationSplitView (controls iPhone navigation).
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    // MARK: - App Storage (User Defaults from Settings)
+
+    /// Default provider ID from user settings.
+    @AppStorage("defaultProviderID") private var storedDefaultProviderID: String?
+
+    /// Default model ID from user settings.
+    @AppStorage("defaultModelID") private var storedDefaultModelID: String?
+
+    /// Default persona ID from user settings.
+    @AppStorage("defaultPersonaID") private var storedDefaultPersonaID: String?
+
+    // MARK: - Query
+
+    /// All enabled providers for looking up defaults.
+    @Query(filter: #Predicate<ProviderConfig> { $0.isEnabled }) private var enabledProviders: [ProviderConfig]
+
+    /// All personas for looking up defaults.
+    @Query(sort: \Persona.sortOrder) private var allPersonas: [Persona]
+
     // MARK: - Body
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
             detailView
+        }
+        .onChange(of: selectedConversation) { _, newValue in
+            // On iPhone, show the detail column when a conversation is selected
+            if newValue != nil {
+                columnVisibility = .detailOnly
+            }
         }
     }
 
@@ -94,31 +123,68 @@ struct ContentView: View {
     /// Creates a new conversation and selects it.
     ///
     /// The new conversation is configured with the default provider, model, and persona
-    /// if available. This ensures users can immediately start sending messages
-    /// without manually selecting a provider first.
+    /// from user settings (DefaultsSettingsView) if available.
+    /// Falls back to first available provider/persona if no defaults are set.
     ///
     /// If `newConversationTitle` is non-empty, it's used as the title.
     /// Otherwise, a default title is generated.
     private func createNewConversation() {
-        withAnimation(.easeInOut(duration: Theme.Animation.default)) {
-            let providerManager = ProviderManager(modelContext: modelContext)
-            let defaultProvider = providerManager.defaultProvider
+        // Resolve provider from stored default or fall back to first enabled provider
+        var defaultProvider: ProviderConfig?
+        if let providerIDString = storedDefaultProviderID,
+           let providerUUID = UUID(uuidString: providerIDString) {
+            // Use the provider from user settings
+            defaultProvider = enabledProviders.first { $0.id == providerUUID }
+        } else {
+            // Fall back to first enabled provider
+            defaultProvider = enabledProviders.first
+        }
 
-            // Get default persona
-            let defaultPersona = Persona.fetchDefault(from: modelContext)
+        // Resolve persona from stored default or fall back to first persona
+        var defaultPersona: Persona?
+        if let personaIDString = storedDefaultPersonaID,
+           let personaUUID = UUID(uuidString: personaIDString) {
+            // Use the persona from user settings
+            defaultPersona = allPersonas.first { $0.id == personaUUID }
+        } else {
+            // Fall back to first persona (or nil if none exist)
+            defaultPersona = allPersonas.first
+        }
 
-            // Use provided title or generate default
-            let title = newConversationTitle.trimmingCharacters(in: .whitespaces).isEmpty
-                ? "New Conversation"
-                : newConversationTitle.trimmingCharacters(in: .whitespaces)
+        // Use provided title or generate default
+        let title = newConversationTitle.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "New Conversation"
+            : newConversationTitle.trimmingCharacters(in: .whitespaces)
 
-            let conversation = Conversation(title: title)
-            conversation.providerConfigID = defaultProvider?.id
+        let conversation = Conversation(title: title)
+        conversation.providerConfigID = defaultProvider?.id
+
+        // Use stored default model ID if available, otherwise use provider's default model
+        if let modelID = storedDefaultModelID {
+            conversation.modelID = modelID
+        } else {
             conversation.modelID = defaultProvider?.defaultModel?.id
-            conversation.personaID = defaultPersona?.id
+        }
 
-            modelContext.insert(conversation)
+        conversation.personaID = defaultPersona?.id
+
+        modelContext.insert(conversation)
+
+        // Explicitly save to ensure personaID is persisted before the view loads
+        do {
+            try modelContext.save()
+        } catch {
+            // Log error but continue - SwiftData will auto-save eventually
+            Logger(subsystem: Constants.BundleID.base, category: "ContentView")
+                .error("Failed to save new conversation: \(error.localizedDescription)")
+        }
+
+        // Set selection and navigation with a slight delay to ensure alert dismissal completes
+        // This is needed for NavigationSplitView on iPhone
+        DispatchQueue.main.async {
             selectedConversation = conversation
+            // Force immediate navigation to detail on iPhone
+            columnVisibility = .detailOnly
         }
     }
 }

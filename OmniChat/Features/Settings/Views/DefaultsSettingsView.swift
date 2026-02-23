@@ -193,6 +193,10 @@ struct DefaultsSettingsView: View {
             return Theme.Colors.ollamaAccent
         case .zhipu:
             return Theme.Colors.zhipuAccent
+        case .zhipuCoding:
+            return Theme.Colors.zhipuAccent
+        case .zhipuAnthropic:
+            return Theme.Colors.anthropicAccent
         case .groq:
             return Theme.Colors.groqAccent
         case .cerebras:

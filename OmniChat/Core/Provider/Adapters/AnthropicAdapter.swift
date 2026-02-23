@@ -275,6 +275,43 @@ final class AnthropicAdapter: AIProvider, Sendable {
         )
     ]
 
+    /// Z.AI GLM models for Anthropic-compatible endpoint.
+    ///
+    /// Z.AI's Anthropic-compatible endpoint supports GLM models.
+    /// Based on Z.AI's documentation.
+    static let zaiModels: [ModelInfo] = [
+        // GLM-4.6 - Latest text model
+        ModelInfo(
+            id: "GLM-4.6",
+            displayName: "GLM-4.6",
+            contextWindow: 128_000,
+            supportsVision: false,
+            supportsStreaming: true,
+            inputTokenCost: 0.5,
+            outputTokenCost: 0.5
+        ),
+        // GLM-4.5 - Previous generation
+        ModelInfo(
+            id: "GLM-4.5",
+            displayName: "GLM-4.5",
+            contextWindow: 128_000,
+            supportsVision: false,
+            supportsStreaming: true,
+            inputTokenCost: 0.5,
+            outputTokenCost: 0.5
+        ),
+        // glm-4.6v - Vision-capable model
+        ModelInfo(
+            id: "glm-4.6v",
+            displayName: "GLM-4.6V (Vision)",
+            contextWindow: 128_000,
+            supportsVision: true,
+            supportsStreaming: true,
+            inputTokenCost: 0.5,
+            outputTokenCost: 0.5
+        )
+    ]
+
     // MARK: - Private Implementation
 
     /// Handles the streaming request and emits events to the continuation.
@@ -391,7 +428,9 @@ final class AnthropicAdapter: AIProvider, Sendable {
         options: RequestOptions
     ) -> AnthropicRequest {
         // Convert messages to Anthropic format
-        let anthropicMessages = messages.map { message in
+        var anthropicMessages: [AnthropicMessage] = []
+
+        for message in messages {
             var content: [AnthropicContent] = []
 
             // Add text content
@@ -426,12 +465,14 @@ final class AnthropicAdapter: AIProvider, Sendable {
                 }
             }
 
-            return AnthropicMessage(
+            anthropicMessages.append(AnthropicMessage(
                 role: message.role == .assistant ? "assistant" : "user",
                 content: content
-            )
+            ))
         }
 
+        // All Anthropic-compatible endpoints (including Z.AI) use the 'system' field
+        // Z.AI's Anthropic endpoint follows the standard Anthropic API format
         return AnthropicRequest(
             model: model,
             maxTokens: options.maxTokens ?? Self.defaultMaxTokens,

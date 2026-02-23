@@ -181,6 +181,16 @@ final class ProviderManager {
             adapter = try ZhipuAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created Zhipu adapter for '\(config.name)'")
 
+        case .zhipuCoding:
+            // Z.AI Coding uses the same ZhipuAdapter
+            adapter = try ZhipuAdapter(config: snapshot, apiKey: apiKey)
+            Self.logger.debug("Created Z.AI Coding adapter for '\(config.name)'")
+
+        case .zhipuAnthropic:
+            // Z.AI Anthropic uses Anthropic API format
+            adapter = AnthropicAdapter(config: snapshot, apiKey: apiKey)
+            Self.logger.debug("Created Z.AI Anthropic adapter for '\(config.name)'")
+
         // OpenAI-compatible providers - use OpenAIAdapter with custom baseURL
         case .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:

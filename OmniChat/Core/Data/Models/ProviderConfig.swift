@@ -14,6 +14,8 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
     case openai
     case ollama
     case zhipu
+    case zhipuCoding       // Z.AI Coding API (OpenAI-compatible)
+    case zhipuAnthropic    // Z.AI Anthropic-compatible API
     // OpenAI-compatible providers
     case groq
     case cerebras
@@ -39,6 +41,10 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "http://localhost:11434"
         case .zhipu:
             return "https://api.z.ai/api/paas/v4"
+        case .zhipuCoding:
+            return "https://api.z.ai/api/coding/paas/v4"
+        case .zhipuAnthropic:
+            return "https://api.z.ai/api/anthropic"
         // OpenAI-compatible providers
         case .groq:
             return "https://api.groq.com/openai"
@@ -78,6 +84,10 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
             return "Ollama"
         case .zhipu:
             return "Z.AI"
+        case .zhipuCoding:
+            return "Z.AI Coding"
+        case .zhipuAnthropic:
+            return "Z.AI (Anthropic)"
         // OpenAI-compatible providers
         case .groq:
             return "Groq"
@@ -109,9 +119,9 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
     /// Returns whether this provider uses OpenAI-compatible API format.
     var isOpenAICompatible: Bool {
         switch self {
-        case .anthropic, .ollama, .zhipu, .custom:
+        case .anthropic, .ollama, .zhipuAnthropic, .custom:
             return false
-        case .openai, .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .openai, .zhipu, .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             return true
         }
