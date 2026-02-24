@@ -1727,6 +1727,10 @@ struct ProviderSetupView: View {
                     isValidated = true
                 }
             case .ollama:
+                // Load API key for Ollama Cloud
+                if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
+                    apiKey = key
+                }
                 isValidated = true
                 connectionTestResult = nil
             }
@@ -2236,7 +2240,8 @@ struct ProviderSetupView: View {
         case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             authMethod = selectedAuthMethod == .oauth ? .oauth : .apiKey
         case .ollama:
-            authMethod = .none
+            // Ollama Cloud requires API key, local Ollama doesn't
+            authMethod = ollamaMode == .cloud ? .apiKey : .none
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             authMethod = .apiKey
