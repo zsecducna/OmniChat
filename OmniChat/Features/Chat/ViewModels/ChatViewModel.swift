@@ -226,8 +226,24 @@ final class ChatViewModel {
     }
 
     /// The model ID to use for requests.
+    ///
+    /// Resolution order:
+    /// 1. User-selected model (temporary selection in UI)
+    /// 2. Conversation's stored modelID
+    /// 3. Provider's default model ID (from ProviderConfig.defaultModelID)
     var effectiveModelID: String {
-        selectedModel ?? currentConversation?.modelID ?? "claude-sonnet-4-5-20250929"
+        if let selected = selectedModel {
+            return selected
+        }
+        if let modelID = currentConversation?.modelID {
+            return modelID
+        }
+        // Fall back to provider's default model
+        if let defaultModelID = currentProviderConfig?.defaultModelID {
+            return defaultModelID
+        }
+        // Final fallback - should rarely happen if providers are configured correctly
+        return "minimax/minimax-m2.5:free"
     }
 
     /// Whether there are any messages in the conversation.

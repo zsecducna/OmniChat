@@ -335,8 +335,12 @@ struct ProviderSetupView: View {
 
             // OpenAI-compatible providers - use same auth flow as OpenAI
             case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
+                 .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                 openAICompatibleAuthSection
+
+            // Kilo Code - supports optional API key (free tier available)
+            case .kilo:
+                kiloAuthSection
 
             case .custom:
                 switch selectedAuthMethod {
@@ -975,6 +979,86 @@ struct ProviderSetupView: View {
         }
     }
 
+    // MARK: - Kilo Code Auth Section
+
+    /// Authentication section for Kilo Code Gateway (optional API key for free tier).
+    @ViewBuilder
+    private var kiloAuthSection: some View {
+        // Free tier info
+        Section {
+            VStack(alignment: .leading, spacing: Theme.Spacing.small.rawValue) {
+                Label {
+                    Text("Kilo Code offers free models that don't require an API key")
+                        .font(Theme.Typography.caption)
+                } icon: {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(Theme.Colors.accent)
+                }
+
+                Text("Without an API key, you'll only see free models. Add a key to access all available models.")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.secondaryText)
+            }
+        } header: {
+            Text("Free Tier")
+        }
+
+        // Optional API Key
+        Section {
+            SecureField("API Key (Optional)", text: $apiKey)
+                .textContentType(.password)
+                #if os(iOS)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        } header: {
+            Text("API Key")
+        } footer: {
+            if apiKey.isEmpty {
+                Text("Leave empty to use free models only, or enter your API key for full access.")
+            } else {
+                Text("Your API key is stored securely in Keychain.")
+            }
+        }
+
+        // Validation
+        Section {
+            Button {
+                validateCredentials()
+            } label: {
+                HStack {
+                    Text("Validate")
+                        .font(Theme.Typography.body)
+                    Spacer()
+                    if isValidating {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            // Allow validation even without API key (for free tier)
+            .disabled(isValidating)
+
+            if let error = validationError {
+                Label(error, systemImage: "xmark.circle")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.destructive)
+            }
+
+            if isValidated {
+                Label(apiKey.isEmpty ? "Free tier available" : "Validated successfully", systemImage: "checkmark.circle")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.success)
+            }
+        } header: {
+            Text("Validation")
+        } footer: {
+            if !isValidated {
+                Text("Validate to check available models")
+            }
+        }
+    }
+
     // MARK: - Ollama Configuration Section
 
     /// Returns whether the current Ollama URL is for a cloud instance.
@@ -1258,9 +1342,14 @@ struct ProviderSetupView: View {
             }
             return true
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
+             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             // OpenAI-compatible providers need API key validation
             return isValidated
+
+        case .kilo:
+            // Kilo Code supports optional API key (free tier)
+            // Allow proceeding if validated, or if skipping validation for free tier
+            return isValidated || (apiKey.isEmpty && !isValidating)
         case .custom:
             // For custom, we need a base URL
             guard !baseURL.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
@@ -1857,7 +1946,7 @@ struct ProviderSetupView: View {
                     }
 
                 case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
-                     .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
+                     .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                     // OpenAI-compatible providers - try to fetch models
                     logger.debug("Fetching models from \(self.providerType.rawValue) (OpenAI-compatible)")
                     if let models = try? await fetchCustomProviderModels(config: tempConfig), !models.isEmpty {
@@ -1876,6 +1965,30 @@ struct ProviderSetupView: View {
                             isFetchingModels = false
                             modelFetchError = "Could not fetch models from provider. Using defaults."
                             loadDefaultModels()
+                        }
+                    }
+
+                case .kilo:
+                    // Kilo Code Gateway - use KiloCodeAdapter directly (different endpoint)
+                    logger.debug("Fetching models from Kilo Code Gateway")
+                    let kiloAdapter = KiloCodeAdapter(config: tempConfig, apiKey: apiKey.isEmpty ? nil : apiKey)
+                    do {
+                        let models = try await kiloAdapter.fetchModels()
+                        logger.debug("Fetched \(models.count) models from Kilo")
+                        await MainActor.run {
+                            isFetchingModels = false
+                            modelFetchError = nil
+                            availableModels = models
+                            if selectedModelID == nil {
+                                selectedModelID = models.first?.id
+                            }
+                        }
+                    } catch {
+                        logger.error("Kilo fetch failed: \(error.localizedDescription)")
+                        await MainActor.run {
+                            isFetchingModels = false
+                            modelFetchError = "Could not fetch models from Kilo Code: \(error.localizedDescription)"
+                            // Don't load default models - user can manually enter model IDs
                         }
                     }
 

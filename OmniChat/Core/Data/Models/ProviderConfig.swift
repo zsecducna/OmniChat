@@ -70,7 +70,7 @@ enum ProviderType: String, Codable, Sendable, CaseIterable {
         case .google:
             return "https://generativelanguage.googleapis.com/v1beta"
         case .kilo:
-            return "https://api.kilo.ai"
+            return "https://api.kilo.ai/api/gateway"
         case .custom:
             return nil
         }

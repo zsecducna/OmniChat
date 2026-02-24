@@ -92,8 +92,11 @@ struct ModelSwitcher: View {
 
     /// The display name for the current model.
     private var modelDisplayName: String {
-        guard let modelID = selectedModelID else {
-            return currentProvider?.defaultModel?.displayName ?? "Select Model"
+        // Get the effective model ID (selected or default)
+        let effectiveModelID = selectedModelID ?? currentProvider?.defaultModelID
+
+        guard let modelID = effectiveModelID else {
+            return "Select Model"
         }
 
         // Find the model in the provider's available models
@@ -102,8 +105,27 @@ struct ModelSwitcher: View {
             return model.displayName
         }
 
-        // Fallback to the raw model ID if not found
-        return modelID
+        // Fallback: format the model ID into a readable name
+        return formatModelDisplayName(modelID)
+    }
+
+    /// Formats a model ID into a readable display name.
+    private func formatModelDisplayName(_ id: String) -> String {
+        // Handle provider/model format (e.g., "minimax/minimax-m2.5:free")
+        let parts = id.split(separator: "/")
+        var modelName = parts.count > 1 ? String(parts[1]) : id
+
+        // Remove :free or other suffixes for display
+        if let colonIndex = modelName.firstIndex(of: ":") {
+            modelName = String(modelName[..<colonIndex])
+        }
+
+        // Convert hyphens to spaces and capitalize words
+        return modelName
+            .replacingOccurrences(of: "-", with: " ")
+            .split(separator: " ")
+            .map { $0.capitalized }
+            .joined(separator: " ")
     }
 
     /// The accent color for the current provider.
@@ -250,8 +272,11 @@ private struct ModelPickerSheet: View {
     @Binding var isPresented: Bool
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
     @State private var searchText = ""
     @State private var expandedProviders: Set<UUID> = []
+    @State private var isRefreshingModels = false
+    @State private var refreshError: String?
 
     /// Maximum number of models to show per provider before "Show all" button
     private let maxModelsPerProvider = 3
@@ -275,6 +300,21 @@ private struct ModelPickerSheet: View {
             .navigationTitle("Switch Model")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task {
+                            await refreshAllModels()
+                        }
+                    } label: {
+                        if isRefreshingModels {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(isRefreshingModels)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         isPresented = false
@@ -365,6 +405,28 @@ private struct ModelPickerSheet: View {
         Dictionary(grouping: providerManager.enabledProviders) { provider in
             provider.providerType.displayName
         }
+    }
+
+    // MARK: - Model Refresh
+
+    /// Refreshes models for all enabled providers.
+    private func refreshAllModels() async {
+        isRefreshingModels = true
+        refreshError = nil
+
+        for provider in providerManager.enabledProviders {
+            do {
+                let models = try await providerManager.fetchModels(for: provider)
+                provider.availableModels = models
+                provider.touch()
+                try? modelContext.save()
+            } catch {
+                // Log error but continue with other providers
+                print("Failed to refresh models for \(provider.name): \(error)")
+            }
+        }
+
+        isRefreshingModels = false
     }
 }
 #endif

@@ -93,16 +93,62 @@ final class ProviderManager {
     ///
     /// Providers are sorted by their `sortOrder` property.
     /// If loading fails, an empty array is used and an error is logged.
+    /// If no providers exist, creates default providers.
     func loadProviders() {
         let descriptor = FetchDescriptor<ProviderConfig>(sortBy: [SortDescriptor(\.sortOrder)])
 
         do {
             providers = try modelContext.fetch(descriptor)
             Self.logger.debug("Loaded \(self.providers.count) provider(s)")
+
+            // Create default providers if no providers exist
+            if providers.isEmpty {
+                Self.logger.info("No providers found, creating default providers")
+                createDefaultProviders()
+            }
         } catch {
             Self.logger.error("Failed to load providers: \(error.localizedDescription)")
             providers = []
+
+            // Try to create default providers on error too
+            createDefaultProviders()
         }
+    }
+
+    // MARK: - Default Providers
+
+    /// Creates default providers for new users.
+    /// Creates Kilo Code (Free) and OpenRouter as default providers.
+    private func createDefaultProviders() {
+        // Create Kilo Code free tier provider (no API key needed)
+        let kiloProvider = ProviderConfig(
+            name: "Kilo Code (Free)",
+            providerType: .kilo,
+            isEnabled: true,
+            isDefault: true,
+            sortOrder: 0,
+            availableModels: [],
+            defaultModelID: "minimax/minimax-m2.5:free"
+        )
+
+        modelContext.insert(kiloProvider)
+
+        // Create OpenRouter provider (requires API key)
+        let openRouterProvider = ProviderConfig(
+            name: "OpenRouter",
+            providerType: .openRouter,
+            isEnabled: true,
+            isDefault: false,
+            sortOrder: 1,
+            availableModels: [],
+            defaultModelID: "openrouter/free"
+        )
+
+        modelContext.insert(openRouterProvider)
+
+        providers = [kiloProvider, openRouterProvider]
+
+        Self.logger.info("Created default providers: Kilo Code (Free) and OpenRouter")
     }
 
     /// Reloads all providers from SwiftData.
@@ -196,9 +242,19 @@ final class ProviderManager {
             adapter = AnthropicAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created Z.AI Anthropic adapter for '\(config.name)'")
 
+        // Kilo Code - uses KiloCodeAdapter with optional API key
+        case .kilo:
+            adapter = KiloCodeAdapter(config: snapshot, apiKey: apiKey.isEmpty ? nil : apiKey)
+            Self.logger.debug("Created Kilo Code adapter for '\(config.name)'")
+
+        // OpenRouter - use dedicated adapter with app attribution headers
+        case .openRouter:
+            adapter = try OpenRouterAdapter(config: snapshot, apiKey: apiKey)
+            Self.logger.debug("Created OpenRouter adapter for '\(config.name)'")
+
         // OpenAI-compatible providers - use OpenAIAdapter with custom baseURL
         case .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
+             .fireworks, .siliconFlow, .xAI, .perplexity, .google:
             adapter = try OpenAIAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created \(config.providerType.displayName) adapter (OpenAI-compatible) for '\(config.name)'")
 
