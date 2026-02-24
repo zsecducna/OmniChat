@@ -68,6 +68,9 @@ struct ChatView: View {
     @State private var scrollToBottomID: UUID?
     @State private var initialMessageCount: Int?
 
+    /// Flag to prevent saving draft when message was just sent.
+    @State private var messageJustSent = false
+
     // MARK: - Constants
 
     /// Dense spacing between messages (Raycast-style: 4-6pt)
@@ -226,12 +229,23 @@ struct ChatView: View {
         }
         .onDisappear {
             // Save draft message when leaving the conversation
-            saveDraftMessage()
+            // Only save if a message wasn't just sent (avoid overwriting with empty)
+            if !messageJustSent {
+                saveDraftMessage()
+            }
+            // Reset flag
+            messageJustSent = false
         }
         .onChange(of: viewModel?.error) { _, newError in
             // Update local error state when view model error changes
             if let error = newError {
                 currentError = error
+            }
+        }
+        .onChange(of: viewModel?.isStreaming) { _, isStreaming in
+            // Auto-focus input when streaming stops
+            if isStreaming == false {
+                isInputFocused = true
             }
         }
         .onChange(of: conversation.personaID) { _, _ in
@@ -281,18 +295,23 @@ struct ChatView: View {
                 .padding(.vertical, Theme.Spacing.small.rawValue)
             }
             .task(id: messages.count) {
+                // Capture current count to avoid race condition
+                let currentCount = messages.count
+
                 // Scroll to bottom on initial load or when messages change
                 if let count = initialMessageCount {
                     // Messages changed after initial load
-                    if messages.count > count {
+                    if currentCount > count {
                         scrollToBottom(proxy: proxy)
                     }
                 } else {
                     // Initial load - capture count and scroll if messages exist
-                    initialMessageCount = messages.count
-                    if !messages.isEmpty {
+                    initialMessageCount = currentCount
+                    if currentCount > 0 {
                         // Small delay to ensure ScrollView is laid out
                         try? await Task.sleep(for: .milliseconds(100))
+                        // Check again after delay in case view was dismissed
+                        guard !Task.isCancelled else { return }
                         scrollToBottom(proxy: proxy)
                     }
                 }
@@ -701,9 +720,12 @@ struct ChatView: View {
         // Clear any existing error
         currentError = nil
 
-        // Clear input and draft
+        // Clear input immediately for UI responsiveness
+        // But keep draft in case send fails
         inputText = ""
-        clearDraftMessage()
+
+        // Mark that a message was just sent (to prevent onDisappear from saving empty draft)
+        messageJustSent = true
 
         // Reset initial message count so scroll triggers on new message
         initialMessageCount = nil
@@ -714,6 +736,18 @@ struct ChatView: View {
         // Send via view model (creates user message, streams AI response, creates assistant message)
         Task {
             await viewModel?.sendMessage(trimmedText)
+
+            // Check if send failed (error will be set in viewModel)
+            if viewModel?.error != nil {
+                // Restore input text on failure so user doesn't lose their message
+                await MainActor.run {
+                    inputText = trimmedText
+                    messageJustSent = false
+                }
+            } else {
+                // Only clear draft after successful send
+                clearDraftMessage()
+            }
         }
     }
 

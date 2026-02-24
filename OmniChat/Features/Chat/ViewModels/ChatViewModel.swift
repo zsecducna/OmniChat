@@ -115,14 +115,6 @@ final class ChatViewModel {
         )
     }
 
-
-    // MARK: - Z.AI Quota Tracking
-
-    /// Quota information for Z.AI subscription-based providers.
-    /// Fetched from the Z.AI monitoring API.
-    var zaiQuotaInfo: ZAIQuotaInfo?
-
-
     /// The model context for SwiftData operations.
     private let modelContext: ModelContext
 
@@ -611,33 +603,6 @@ final class ChatViewModel {
         } catch {
             Self.logger.error("Failed to fetch persona: \(error.localizedDescription)")
             return nil
-        }
-    }
-
-    // MARK: - Z.AI Quota Fetching
-    /// Fetches quota information for Z.AI providers.
-    /// Called when streaming starts to show current usage percentage.
-    private func fetchZAIQuota() {
-        // Only fetch for Z.AI providers
-        guard let providerConfig = currentProviderConfig,
-              (providerConfig.providerType == .zhipu || providerConfig.providerType == .zhipuAnthropic) else {
-            return
-        }
-        // Get the adapter
-        guard let provider = currentProvider as? ZhipuAdapter else {
-            return
-        }
-        // Fetch quota in background
-        Task {
-            do {
-                let info = await provider.fetchQuota()
-                await MainActor.run {
-                    self.zaiQuotaInfo = info
-                }
-            } catch {
-                Self.logger.warning("Failed to fetch Z.AI quota: \(error.localizedDescription)")
-                zaiQuotaInfo = nil
-            }
         }
     }
 

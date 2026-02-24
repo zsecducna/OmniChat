@@ -105,16 +105,13 @@ final class ProviderManager {
             if providers.isEmpty {
                 Self.logger.info("No providers found, creating default providers")
             }
-
-            // Ensure Kilo Code (Free) is always available
-            ensurePreconfiguredProviders()
         } catch {
             Self.logger.error("Failed to load providers: \(error.localizedDescription)")
             providers = []
-
-            // Ensure Kilo Code (Free) is always available
-            ensurePreconfiguredProviders()
         }
+
+        // Ensure Kilo Code (Free) is always available (called once after load attempt)
+        ensurePreconfiguredProviders()
     }
 
     // MARK: - Default Providers

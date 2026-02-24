@@ -48,6 +48,9 @@ struct UsageMonitorView: View {
     /// Whether currently fetching usage.
     @State private var isFetching = false
 
+    /// Last time quota was refreshed (for 5-minute interval).
+    @State private var lastQuotaRefresh: Date?
+
     // MARK: - Body
 
     var body: some View {
@@ -85,17 +88,22 @@ struct UsageMonitorView: View {
         .task {
             await loadUsageData()
         }
-        .onAppear {
-            // Update every minute
-            Task {
-                while true {
-                    try? await Task.sleep(for: .seconds(60))
-                    updateTime = Date()
-                    await loadHourlyUsage()
-                    // Refresh provider quota every 5 minutes
-                    if Date().timeIntervalSince(updateTime).truncatingRemainder(dividingBy: 300) < 60 {
-                        await fetchProviderQuota()
-                    }
+        .task(id: providerConfig?.id) {
+            // Periodic update loop with proper cancellation support
+            lastQuotaRefresh = Date()
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard !Task.isCancelled else { break }
+
+                updateTime = Date()
+                await loadHourlyUsage()
+
+                // Refresh provider quota every 5 minutes
+                if let lastRefresh = lastQuotaRefresh,
+                   Date().timeIntervalSince(lastRefresh) >= 300 {
+                    await fetchProviderQuota()
+                    lastQuotaRefresh = Date()
                 }
             }
         }
