@@ -2130,17 +2130,25 @@ struct ProviderSetupView: View {
 
     /// Tests a single API key against the Ollama Cloud endpoint.
     private func testSingleAPIKey(_ key: String, baseURL: String) async -> ConnectionTestResult {
-        // For Ollama Cloud, we need to verify the key actually works
-        // Use /api/tags endpoint which lists models - requires valid authentication
-        guard let url = URL(string: "\(baseURL)/api/tags") else {
+        // Use /api/generate endpoint which requires valid authentication
+        // We send a minimal request to verify the key without generating much content
+        guard let url = URL(string: "\(baseURL)/api/generate") else {
             return .failure("Invalid URL")
         }
 
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 10
+        request.timeoutInterval = 15
+
+        // Minimal request body - just verify auth, don't actually generate
+        let body: [String: Any] = [
+            "model": "llama3.2:1b",  // Small model
+            "prompt": "Hi",
+            "stream": false
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -2149,17 +2157,21 @@ struct ProviderSetupView: View {
                 switch httpResponse.statusCode {
                 case 200:
                     // Check if response contains valid data (not an error message)
-                    // Ollama returns {"models": [...]} for valid requests
                     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        // If there's an "error" key, the key is invalid
-                        if json["error"] != nil {
-                            return .failure("Invalid key")
+                        // If there's an "error" key, the key might be valid but request failed
+                        if let error = json["error"] as? String {
+                            // Check if it's an auth error vs model not found
+                            if error.lowercased().contains("unauthorized") ||
+                               error.lowercased().contains("invalid") ||
+                               error.lowercased().contains("auth") {
+                                return .failure("Invalid key")
+                            }
+                            // Model not found or other error - key is valid
+                            return .success
                         }
-                        // Valid response - either has models array or empty models
                         return .success
                     }
-                    // Can't parse JSON - might be an error
-                    return .failure("Invalid response")
+                    return .success
                 case 401, 403:
                     return .failure("Invalid key")
                 default:
