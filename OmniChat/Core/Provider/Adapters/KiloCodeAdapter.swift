@@ -1,48 +1,49 @@
 //
-//  ZhipuAdapter.swift
+//  KiloCodeAdapter.swift
 //  OmniChat
 //
-//  Adapter for Z.AI (ZhipuAI) GLM models API with streaming support.
-//  Implements the AIProvider protocol for Z.AI integration.
-//  OpenAI-compatible API format.
+//  Adapter for Kilo Code Gateway API with streaming support.
+//  Implements the AIProvider protocol for Kilo Code integration.
+//  OpenAI-compatible API format with optional authentication.
 //
 
 import Foundation
 import os
 
-// MARK: - Zhipu Adapter
+// MARK: - Kilo Code Adapter
 
-/// Adapter for Z.AI (ZhipuAI) GLM models API with streaming support.
+/// Adapter for Kilo Code Gateway API with streaming support.
 ///
-/// This adapter implements the `AIProvider` protocol for Z.AI's OpenAI-compatible API.
+/// This adapter implements the `AIProvider` protocol for Kilo Code's OpenAI-compatible API.
 /// It supports:
 /// - Chat completions with streaming (SSE format)
 /// - Vision support via image_url content blocks
-/// - Model listing (hardcoded fallback)
-/// - Bearer token authentication
+/// - Model listing from Kilo gateway
+/// - Optional API key authentication (free tier available without key)
+/// - "kilo/auto" smart routing model that selects the best model for each task
 ///
 /// ## API Details
-/// - Base URL: `https://api.z.ai/api/paas/v4`
-/// - Chat Endpoint: `POST /chat/completions`
-/// - Auth Header: `Authorization: Bearer <key>`
-/// - Additional Header: `Accept-Language: en-US,en`
+/// - Base URL: `https://api.kilo.ai/api/gateway`
+/// - Chat Endpoint: `POST /chat/completions` (note: no `/v1/` prefix)
+/// - Models Endpoint: `GET /models`
+/// - Auth Header: `Authorization: Bearer <key>` (optional)
 ///
-/// ## Streaming Format
-/// Z.AI uses Server-Sent Events (SSE) with OpenAI-compatible format:
-/// ```
-/// data: {"choices":[{"delta":{"content":"Hello"}}]}
-/// data: {"choices":[{"delta":{"content":" world"}}]}
-/// data: [DONE]
-/// ```
+/// ## Free Tier
+/// Kilo Code offers a free tier that allows access to all models with rate limiting.
+/// No API key is required to start chatting. The "kilo/auto" model is recommended
+/// as it automatically routes requests to the best available model for the task.
 ///
 /// ## Example Usage
 /// ```swift
-/// let config = ProviderConfig(name: "My Z.AI", providerType: .zhipu)
-/// let adapter = ZhipuAdapter(config: config.makeSnapshot(), apiKey: "your-api-key")
+/// let config = ProviderConfig(name: "Kilo Code", providerType: .kilo)
+/// // With API key
+/// let adapter = KiloCodeAdapter(config: config.makeSnapshot(), apiKey: "your-api-key")
+/// // Without API key (free tier)
+/// let adapter = KiloCodeAdapter(config: config.makeSnapshot(), apiKey: nil)
 ///
 /// let stream = adapter.sendMessage(
 ///     messages: [ChatMessage(role: .user, content: "Hello")],
-///     model: "glm-5",
+///     model: "kilo/auto",  // Smart routing
 ///     systemPrompt: nil,
 ///     attachments: [],
 ///     options: RequestOptions()
@@ -54,7 +55,7 @@ import os
 ///     }
 /// }
 /// ```
-final class ZhipuAdapter: AIProvider, Sendable {
+final class KiloCodeAdapter: AIProvider, Sendable {
 
     // MARK: - Properties
 
@@ -64,14 +65,13 @@ final class ZhipuAdapter: AIProvider, Sendable {
     /// The HTTP client for making requests.
     private let httpClient: HTTPClient
 
-    /// The API key for authentication (stored securely, passed from Keychain).
-    private let apiKey: String
+    /// The API key for authentication (optional - free tier available without key).
+    private let apiKey: String?
 
-    /// Logger for Zhipu adapter operations.
-    private static let logger = Logger(subsystem: Constants.BundleID.base, category: "ZhipuAdapter")
+    /// Logger for Kilo Code adapter operations.
+    private static let logger = Logger(subsystem: Constants.BundleID.base, category: "KiloCodeAdapter")
 
     /// Active streaming task for cancellation support.
-    /// Uses an actor-isolated box for thread-safe access since this is mutable state.
     private final class ActiveTaskBox: @unchecked Sendable {
         private var _task: Task<Void, Never>?
         private let lock = NSLock()
@@ -94,55 +94,114 @@ final class ZhipuAdapter: AIProvider, Sendable {
 
     // MARK: - Constants
 
-    /// Z.AI API endpoints.
+    /// Kilo Code API endpoints (note: no `/v1/` prefix).
     private enum Endpoints {
         static let chatCompletions = "/chat/completions"
+        static let models = "/models"
     }
 
-    /// Default base URL for Z.AI API.
-    private static let defaultBaseURL = "https://api.z.ai/api/paas/v4"
+    /// Default base URL for Kilo Code API.
+    private static let defaultBaseURL = "https://api.kilo.ai/api/gateway"
 
     // MARK: - Initialization
 
-    /// Creates a new Zhipu adapter.
+    /// Creates a new Kilo Code adapter.
     ///
     /// - Parameters:
     ///   - config: The provider configuration snapshot (contains base URL, custom headers, etc.)
-    ///   - apiKey: The Z.AI API key (should be retrieved from Keychain)
+    ///   - apiKey: The Kilo Code API key (optional - free tier available without key)
     ///   - httpClient: The HTTP client for making requests (defaults to new instance)
-    /// - Throws: `ProviderError.invalidAPIKey` if the API key is empty.
     init(
         config: ProviderConfigSnapshot,
-        apiKey: String,
+        apiKey: String?,
         httpClient: HTTPClient = HTTPClient()
-    ) throws {
-        guard !apiKey.isEmpty else {
-            throw ProviderError.invalidAPIKey
-        }
-
+    ) {
         self.config = config
-        self.apiKey = apiKey
+        self.apiKey = apiKey?.isEmpty == true ? nil : apiKey
         self.httpClient = httpClient
+
+        if apiKey == nil || apiKey?.isEmpty == true {
+            Self.logger.debug("Kilo Code adapter initialized without API key (free tier mode)")
+        } else {
+            Self.logger.debug("Kilo Code adapter initialized with API key")
+        }
     }
 
     // MARK: - AIProvider Conformance
 
-    /// Fetches available models from Z.AI.
+    /// Fetches available models from Kilo Code Gateway.
     ///
-    /// Z.AI does not have a public /models endpoint, so this returns a hardcoded list.
+    /// Kilo's free tier allows access to all models with rate limiting.
+    /// The "kilo/auto" model is placed first as the smart routing default.
     ///
-    /// - Returns: Array of `ModelInfo` for available GLM models.
+    /// - Returns: Array of `ModelInfo` for available models.
     func fetchModels() async throws -> [ModelInfo] {
-        // Z.AI does not have a /models endpoint, return hardcoded defaults
-        Self.logger.debug("Returning hardcoded Z.AI models")
-        return defaultModels
+        let baseURL = config.effectiveBaseURL ?? Self.defaultBaseURL
+        guard let url = URL(string: "\(baseURL)\(Endpoints.models)") else {
+            throw ProviderError.invalidResponse("Invalid URL for models endpoint")
+        }
+
+        let headers = buildHeaders()
+        Self.logger.debug("Fetching models from Kilo Code Gateway")
+
+        do {
+            let data = try await httpClient.request(
+                url: url,
+                method: "GET",
+                headers: headers
+            )
+
+            let response = try JSONDecoder().decode(KiloModelsResponse.self, from: data)
+            let models = response.data
+
+            Self.logger.debug("Fetched \(models.count) models from Kilo Code")
+
+            // Convert to ModelInfo
+            let modelInfos = models.map { model in
+                // Use API name if available, otherwise format from ID
+                let displayName = model.name ?? formatModelDisplayName(model.id)
+                // Use API context_length if available
+                let contextWindow = model.context_length ?? contextWindowForModel(model.id)
+                // Check if model supports vision from architecture
+                let supportsVision = model.architecture?.input_modalities?.contains("image") ?? modelSupportsVision(model.id)
+                // Check if model is free (works without API key)
+                let isFree = model.pricing?.isFree ?? false
+
+                return ModelInfo(
+                    id: model.id,
+                    displayName: displayName,
+                    contextWindow: contextWindow,
+                    supportsVision: supportsVision,
+                    supportsStreaming: true,
+                    inputTokenCost: model.pricing?.inputCostPerToken,
+                    outputTokenCost: model.pricing?.outputCostPerToken
+                )
+            }
+
+            // Sort: free models first (work without API key), then alphabetically
+            // Note: Models with :free suffix or 0 pricing work without authentication
+            return modelInfos.sorted { first, second in
+                let firstFree = first.id.hasSuffix(":free") || (first.inputTokenCost ?? 1) == 0
+                let secondFree = second.id.hasSuffix(":free") || (second.inputTokenCost ?? 1) == 0
+
+                if firstFree && !secondFree { return true }
+                if !firstFree && secondFree { return false }
+                return first.displayName < second.displayName
+            }
+
+        } catch let error as ProviderError {
+            throw error
+        } catch {
+            Self.logger.error("Failed to fetch models: \(error.localizedDescription)")
+            throw ProviderError.networkError(underlying: error)
+        }
     }
 
     /// Sends a chat completion request and returns a streaming response.
     ///
     /// - Parameters:
     ///   - messages: Array of chat messages forming the conversation history.
-    ///   - model: The model identifier to use (e.g., "glm-5", "glm-4.7").
+    ///   - model: The model identifier to use (e.g., "anthropic/claude-sonnet-4.5").
     ///   - systemPrompt: Optional system prompt to prepend to the conversation.
     ///   - attachments: Array of attachments (images) to include.
     ///   - options: Request options like temperature, max tokens, etc.
@@ -178,38 +237,35 @@ final class ZhipuAdapter: AIProvider, Sendable {
         }
     }
 
-    /// Validates the current API key by making a minimal request.
+    /// Validates the current credentials by making a minimal request.
     ///
-    /// - Returns: `true` if the API key is valid, `false` otherwise.
+    /// - Returns: `true` if credentials are valid (or no auth required), `false` otherwise.
     func validateCredentials() async throws -> Bool {
+        // If no API key, free tier is always "valid"
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            Self.logger.debug("No API key set - free tier mode")
+            return true
+        }
+
         let baseURL = config.effectiveBaseURL ?? Self.defaultBaseURL
-        guard let url = URL(string: "\(baseURL)\(Endpoints.chatCompletions)") else {
+        guard let url = URL(string: "\(baseURL)\(Endpoints.models)") else {
             throw ProviderError.invalidResponse("Invalid URL for validation")
         }
 
-        // Send a minimal request to validate credentials
-        let requestBody: [String: Any] = [
-            "model": "glm-5",
-            "messages": [["role": "user", "content": "Hi"]],
-            "max_tokens": 1
-        ]
-        let body = try JSONSerialization.data(withJSONObject: requestBody)
         let headers = buildHeaders()
-
-        Self.logger.debug("Validating Z.AI credentials")
+        Self.logger.debug("Validating Kilo Code credentials")
 
         do {
             _ = try await httpClient.request(
                 url: url,
-                method: "POST",
-                headers: headers,
-                body: body
+                method: "GET",
+                headers: headers
             )
-            Self.logger.debug("Z.AI credentials validated successfully")
+            Self.logger.debug("Kilo Code credentials validated successfully")
             return true
         } catch let error as ProviderError {
             if case .unauthorized = error {
-                Self.logger.warning("Z.AI credentials are invalid")
+                Self.logger.warning("Kilo Code credentials are invalid")
                 return false
             }
             throw error
@@ -222,64 +278,21 @@ final class ZhipuAdapter: AIProvider, Sendable {
     func cancel() {
         activeTaskBox.task?.cancel()
         activeTaskBox.task = nil
-        Self.logger.debug("Z.AI request cancelled")
-    }
-
-    /// Fetches the current quota usage from Z.AI monitoring API.
-    ///
-    /// Z.AI uses a subscription-based model with a 5-hour rolling token limit.
-    /// This endpoint returns the current usage percentage and reset time.
-    ///
-    /// - Returns: `ZAIQuotaInfo` with token percentage and reset time, or nil if unavailable.
-    func fetchQuota() async -> ZAIQuotaInfo? {
-        // Build the quota endpoint URL
-        let baseURLString = config.effectiveBaseURL ?? Self.defaultBaseURL
-        guard let baseURL = URL(string: baseURLString),
-              let quotaURL = URL(string: "api/monitor/usage/quota/limit", relativeTo: baseURL) else {
-            Self.logger.warning("Invalid URL for quota endpoint")
-            return nil
-        }
-
-        let headers = buildHeaders()
-
-        Self.logger.debug("Fetching Z.AI quota from: \(quotaURL.absoluteString)")
-
-        do {
-            let data = try await httpClient.request(
-                url: quotaURL,
-                method: "GET",
-                headers: headers,
-                body: nil
-            )
-
-            let response = try JSONDecoder().decode(ZAIQuotaResponse.self, from: data)
-
-            Self.logger.debug("Z.AI quota fetched successfully")
-
-            // Extract token quota (5-hour window)
-            if let tokenQuota = response.data?.tokenQuota {
-                return ZAIQuotaInfo(
-                    tokenPercentage: tokenQuota.percentage,
-                    resetTime: tokenQuota.resetTime
-                )
-            }
-
-            return nil
-        } catch {
-            Self.logger.warning("Failed to fetch Z.AI quota: \(error.localizedDescription)")
-            return nil
-        }
+        Self.logger.debug("Kilo Code request cancelled")
     }
 
     // MARK: - Private Helpers
 
-    /// Builds the HTTP headers for Z.AI requests.
+    /// Builds the HTTP headers for Kilo Code requests.
     private func buildHeaders() -> [String: String] {
         var headers: [String: String] = [
-            "Authorization": "Bearer \(apiKey)",
-            "Content-Type": "application/json",
-            "Accept-Language": "en-US,en"
+            "Content-Type": "application/json"
         ]
+
+        // Add authorization if API key is provided
+        if let apiKey = apiKey, !apiKey.isEmpty {
+            headers["Authorization"] = "Bearer \(apiKey)"
+        }
 
         // Add any custom headers from config
         for (key, value) in config.customHeaders {
@@ -317,7 +330,7 @@ final class ZhipuAdapter: AIProvider, Sendable {
             let body = try JSONEncoder().encode(requestBody)
             let headers = buildHeaders()
 
-            Self.logger.debug("Starting Z.AI streaming request to model: \(model)")
+            Self.logger.debug("Starting Kilo Code streaming request to model: \(model)")
 
             // Start streaming request
             let bytes = try await httpClient.stream(
@@ -336,24 +349,24 @@ final class ZhipuAdapter: AIProvider, Sendable {
                 }
 
                 // Parse the JSON event (OpenAI-compatible format)
-                if let event = try? JSONDecoder().decode(ZhipuStreamChunk.self, from: eventData) {
+                if let event = try? JSONDecoder().decode(KiloStreamChunk.self, from: eventData) {
                     handleStreamChunk(event, continuation: continuation)
                 }
             }
 
             // Stream completed
-            Self.logger.debug("Z.AI stream completed")
+            Self.logger.debug("Kilo Code stream completed")
             continuation.yield(.done)
             continuation.finish()
 
         } catch let error as ProviderError {
-            Self.logger.error("Z.AI stream error: \(error.description)")
+            Self.logger.error("Kilo Code stream error: \(error.description)")
             continuation.finish(throwing: error)
         } catch is CancellationError {
-            Self.logger.debug("Z.AI stream cancelled")
+            Self.logger.debug("Kilo Code stream cancelled")
             continuation.finish(throwing: ProviderError.cancelled)
         } catch {
-            Self.logger.error("Z.AI stream error: \(error.localizedDescription)")
+            Self.logger.error("Kilo Code stream error: \(error.localizedDescription)")
             continuation.finish(throwing: ProviderError.networkError(underlying: error))
         }
     }
@@ -365,7 +378,7 @@ final class ZhipuAdapter: AIProvider, Sendable {
         systemPrompt: String?,
         attachments: [AttachmentPayload],
         options: RequestOptions
-    ) -> ZhipuRequest {
+    ) -> KiloRequest {
         // Convert messages to OpenAI-compatible format
         var openAIMessages: [[String: Any]] = []
 
@@ -401,7 +414,7 @@ final class ZhipuAdapter: AIProvider, Sendable {
             body["top_p"] = topP
         }
 
-        return ZhipuRequest(dictionary: body)
+        return KiloRequest(dictionary: body)
     }
 
     /// Formats a ChatMessage for OpenAI-compatible API format.
@@ -446,7 +459,7 @@ final class ZhipuAdapter: AIProvider, Sendable {
 
     /// Handles a streaming chunk and emits appropriate events.
     private func handleStreamChunk(
-        _ chunk: ZhipuStreamChunk,
+        _ chunk: KiloStreamChunk,
         continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
     ) {
         // Emit model confirmation if available
@@ -473,40 +486,66 @@ final class ZhipuAdapter: AIProvider, Sendable {
         }
     }
 
-    // MARK: - Default Models
+    // MARK: - Model Helpers
 
-    /// Default models for Z.AI when fetch fails.
-    ///
-    /// Z.AI uses GLM models via fixed subscription, not per-token billing.
-    /// Token costs are set to nil to indicate subscription-based pricing.
-    private var defaultModels: [ModelInfo] {
-        [
-            ModelInfo(
-                id: "glm-5",
-                displayName: "GLM-5",
-                contextWindow: 128_000,
-                supportsVision: true,
-                supportsStreaming: true,
-                inputTokenCost: nil,
-                outputTokenCost: nil
-            ),
-            ModelInfo(
-                id: "glm-4.7",
-                displayName: "GLM-4.7",
-                contextWindow: 128_000,
-                supportsVision: true,
-                supportsStreaming: true,
-                inputTokenCost: nil,
-                outputTokenCost: nil
-            )
-        ]
+    /// Formats a model ID into a display name.
+    private func formatModelDisplayName(_ id: String) -> String {
+        // Kilo uses format like "anthropic/claude-sonnet-4.5"
+        // Extract the model name after the provider prefix
+        let parts = id.split(separator: "/")
+        if parts.count > 1 {
+            let modelName = String(parts[1])
+            // Format the model name
+            return modelName
+                .replacingOccurrences(of: "-", with: " ")
+                .split(separator: " ")
+                .map { $0.capitalized }
+                .joined(separator: " ")
+        }
+        return id
+    }
+
+    /// Returns the context window for a model.
+    private func contextWindowForModel(_ id: String) -> Int? {
+        // Context windows for common models
+        if id.contains("claude-sonnet") || id.contains("claude-3.5") {
+            return 200_000
+        } else if id.contains("claude-opus") || id.contains("claude-3-opus") {
+            return 200_000
+        } else if id.contains("claude-haiku") {
+            return 200_000
+        } else if id.contains("gpt-4o") {
+            return 128_000
+        } else if id.contains("gpt-4-turbo") {
+            return 128_000
+        } else if id.contains("gpt-4") {
+            return 8_192
+        } else if id.contains("gpt-3.5") {
+            return 16_384
+        } else if id.contains("llama") || id.contains("mixtral") {
+            return 32_000
+        }
+        return nil
+    }
+
+    /// Returns whether a model supports vision.
+    private func modelSupportsVision(_ id: String) -> Bool {
+        // Models that support vision
+        return id.contains("claude-sonnet") ||
+               id.contains("claude-opus") ||
+               id.contains("claude-3") ||
+               id.contains("gpt-4o") ||
+               id.contains("gpt-4-turbo") ||
+               id.contains("gpt-4-vision") ||
+               id.contains("llama-3.2") ||
+               id.contains("gemini")
     }
 }
 
-// MARK: - Zhipu Request/Response Models
+// MARK: - Kilo Request/Response Models
 
-/// Wrapper for building Zhipu request body as a dictionary.
-private struct ZhipuRequest: Encodable {
+/// Wrapper for building Kilo request body as a dictionary.
+private struct KiloRequest: Encodable {
     let dictionary: [String: Any]
 
     func encode(to encoder: Encoder) throws {
@@ -553,18 +592,72 @@ private struct AnyCodable: Encodable {
     }
 }
 
-/// A streaming chunk from Z.AI's chat completions API (OpenAI-compatible).
-private struct ZhipuStreamChunk: Decodable {
-    let id: String?
-    let model: String?
-    let choices: [ZhipuChoice]
-    let usage: ZhipuUsage?
+/// Response from Kilo's /models endpoint.
+private struct KiloModelsResponse: Decodable {
+    let data: [KiloModel]
 }
 
-/// A choice in a Zhipu streaming response.
-private struct ZhipuChoice: Decodable {
+/// A model object from Kilo's models list.
+private struct KiloModel: Decodable {
+    let id: String
+    let name: String?
+    let pricing: KiloPricing?
+    let context_length: Int?
+    let architecture: KiloArchitecture?
+}
+
+/// Architecture information for a Kilo model.
+private struct KiloArchitecture: Decodable {
+    let input_modalities: [String]?
+    let output_modalities: [String]?
+}
+
+/// Pricing information for a Kilo model.
+/// API returns prices as strings like "0.0000010" (price per token).
+private struct KiloPricing: Decodable {
+    let prompt: String?
+    let completion: String?
+    let request: String?
+    let image: String?
+    let web_search: String?
+    let internal_reasoning: String?
+
+    /// Whether this model is free (zero cost for both prompt and completion).
+    var isFree: Bool {
+        guard let promptPrice = prompt, let completionPrice = completion else {
+            return false
+        }
+        // Check if both prices are effectively zero
+        let promptValue = Double(promptPrice) ?? 0
+        let completionValue = Double(completionPrice) ?? 0
+        return promptValue == 0 && completionValue == 0
+    }
+
+    /// Cost per input token (parsed from string price).
+    var inputCostPerToken: Double? {
+        guard let prompt = prompt else { return nil }
+        return Double(prompt)
+    }
+
+    /// Cost per output token (parsed from string price).
+    var outputCostPerToken: Double? {
+        guard let completion = completion else { return nil }
+        return Double(completion)
+    }
+}
+
+/// A streaming chunk from Kilo's chat completions API (OpenAI-compatible).
+private struct KiloStreamChunk: Decodable {
+    let id: String?
+    let model: String?
+    let choices: [KiloChoice]
+    let usage: KiloUsage?
+}
+
+/// A choice in a Kilo streaming response.
+private struct KiloChoice: Decodable {
     let index: Int
-    let delta: ZhipuDelta?
+    let delta: KiloDelta?
     let finishReason: String?
 
     enum CodingKeys: String, CodingKey {
@@ -573,14 +666,14 @@ private struct ZhipuChoice: Decodable {
     }
 }
 
-/// A delta content object in a Zhipu streaming response.
-private struct ZhipuDelta: Decodable {
+/// A delta content object in a Kilo streaming response.
+private struct KiloDelta: Decodable {
     let role: String?
     let content: String?
 }
 
-/// Token usage information from Zhipu.
-private struct ZhipuUsage: Decodable {
+/// Token usage information from Kilo.
+private struct KiloUsage: Decodable {
     let promptTokens: Int?
     let completionTokens: Int?
     let totalTokens: Int?
@@ -590,77 +683,4 @@ private struct ZhipuUsage: Decodable {
         case completionTokens = "completion_tokens"
         case totalTokens = "total_tokens"
     }
-}
-
-// MARK: - Z.AI Quota Models
-
-/// Quota information for Z.AI subscription-based providers.
-///
-/// Z.AI uses a subscription model with a 5-hour rolling token limit.
-/// This struct represents the current usage percentage and reset time.
-public struct ZAIQuotaInfo: Sendable {
-    /// The current token usage percentage (0-100).
-    public let tokenPercentage: Double
-
-    /// When the quota will reset (ISO 8601 date string or Date).
-    public let resetTime: String?
-
-    /// Creates a new quota info instance.
-    public init(tokenPercentage: Double, resetTime: String?) {
-        self.tokenPercentage = tokenPercentage
-        self.resetTime = resetTime
-    }
-
-    /// Returns the remaining percentage (100 - used).
-    public var remainingPercentage: Double {
-        100.0 - tokenPercentage
-    }
-
-    /// Formats the reset time for display.
-    /// Returns a human-readable string like "Resets in 2h 30m" or the raw date.
-    public var resetTimeDisplay: String {
-        guard let resetTime = resetTime else {
-            return "Unknown"
-        }
-
-        // Try to parse the ISO date
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-
-        guard let date = formatter.date(from: resetTime) else {
-            return resetTime
-        }
-
-        let now = Date()
-        let interval = date.timeIntervalSince(now)
-
-        if interval <= 0 {
-            return "Resets soon"
-        }
-
-        let hours = Int(interval / 3600)
-        let minutes = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
-
-        if hours > 0 {
-            return "Resets in \(hours)h \(minutes)m"
-        } else {
-            return "Resets in \(minutes)m"
-        }
-    }
-}
-
-/// Response from the Z.AI quota monitoring endpoint.
-private struct ZAIQuotaResponse: Decodable {
-    let data: ZAIQuotaData?
-}
-
-/// Quota data from the response.
-private struct ZAIQuotaData: Decodable {
-    let tokenQuota: ZAITokenQuota?
-}
-
-/// Token quota details.
-private struct ZAITokenQuota: Decodable {
-    let percentage: Double
-    let resetTime: String?
 }

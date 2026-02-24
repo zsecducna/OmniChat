@@ -22,15 +22,13 @@ import os
 /// - Swipe to delete (with confirmation)
 /// - Swipe to enable/disable
 /// - Reorder via drag
+/// - Bulk delete in edit mode with multi-select
 ///
 struct ProviderListView: View {
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    #if os(iOS)
-    @Environment(\.editMode) private var editMode
-    #endif
 
     // MARK: - Query
 
@@ -43,7 +41,10 @@ struct ProviderListView: View {
     @State private var providerToEdit: ProviderConfig?
     @State private var providerToDelete: ProviderConfig?
     @State private var showDeleteConfirmation = false
+    @State private var showBulkDeleteConfirmation = false
     @State private var searchText = ""
+    @State private var selectedProviderIDs: Set<ProviderConfig.ID> = []
+    @State private var isEditMode = false
 
     // MARK: - Computed Properties
 
@@ -62,22 +63,43 @@ struct ProviderListView: View {
     // MARK: - Body
 
     var body: some View {
-        List {
+        List(selection: isEditMode ? $selectedProviderIDs : .constant(Set<ProviderConfig.ID>())) {
             ForEach(filteredProviders) { provider in
                 ProviderRow(provider: provider, colorScheme: colorScheme)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        providerToEdit = provider
+                        if isEditMode {
+                            // Toggle selection in edit mode
+                            if selectedProviderIDs.contains(provider.id) {
+                                selectedProviderIDs.remove(provider.id)
+                            } else {
+                                selectedProviderIDs.insert(provider.id)
+                            }
+                        } else {
+                            providerToEdit = provider
+                        }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        deleteButton(for: provider)
+                        if !isEditMode {
+                            deleteButton(for: provider)
+                        }
                     }
                     .swipeActions(edge: .leading) {
-                        toggleButton(for: provider)
+                        if !isEditMode {
+                            toggleButton(for: provider)
+                        }
                     }
             }
             .onMove { from, to in
                 moveProviders(from: from, to: to)
+            }
+            .onDelete { indexSet in
+                // Handle delete from swipe in non-edit mode
+                for index in indexSet {
+                    let provider = filteredProviders[index]
+                    providerToDelete = provider
+                    showDeleteConfirmation = true
+                }
             }
         }
         #if os(iOS)
@@ -101,13 +123,36 @@ struct ProviderListView: View {
                 .accessibilityHint("Opens the provider setup wizard")
             }
 
-            #if os(iOS)
-            ToolbarItem(placement: .navigationBarLeading) {
-                EditButton()
-                    .accessibilityLabel("Edit providers")
-                    .accessibilityHint("Toggle edit mode to reorder or delete providers")
+            ToolbarItem(placement: .automatic) {
+                HStack(spacing: Theme.Spacing.small.rawValue) {
+                    // Bulk delete button when items are selected
+                    if isEditMode && !selectedProviderIDs.isEmpty {
+                        Button(role: .destructive) {
+                            showBulkDeleteConfirmation = true
+                        } label: {
+                            HStack(spacing: Theme.Spacing.tight.rawValue) {
+                                Image(systemName: "trash")
+                                Text("\(selectedProviderIDs.count)")
+                            }
+                        }
+                        .accessibilityLabel("Delete \(selectedProviderIDs.count) selected providers")
+                    }
+
+                    // Edit/Done button
+                    Button {
+                        withAnimation {
+                            isEditMode.toggle()
+                            if !isEditMode {
+                                selectedProviderIDs.removeAll()
+                            }
+                        }
+                    } label: {
+                        Text(isEditMode ? "Done" : "Edit")
+                    }
+                    .accessibilityLabel(isEditMode ? "Exit edit mode" : "Enter edit mode")
+                    .accessibilityHint(isEditMode ? "Exits edit mode" : "Enter edit mode to select and delete multiple providers")
+                }
             }
-            #endif
         }
         .sheet(isPresented: $showAddProvider) {
             ProviderSetupView(provider: nil)
@@ -125,6 +170,18 @@ struct ProviderListView: View {
             }
         } message: { provider in
             Text("Are you sure you want to delete '\(provider.name)'? This will also remove the associated API key.")
+        }
+        .confirmationDialog(
+            "Delete \(selectedProviderIDs.count) Providers?",
+            isPresented: $showBulkDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteSelectedProviders()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete \(selectedProviderIDs.count) providers? This will also remove their associated API keys.")
         }
         .overlay {
             if providers.isEmpty {
@@ -192,6 +249,7 @@ struct ProviderListView: View {
             case .xAI: return "x.square"
             case .perplexity: return "magnifyingglass"
             case .google: return "g.circle"
+            case .kilo: return "k.circle"
             case .custom: return "ellipsis.circle"
             }
         }
@@ -216,6 +274,7 @@ struct ProviderListView: View {
             case .xAI: return Theme.Colors.xAIAccent
             case .perplexity: return Theme.Colors.perplexityAccent
             case .google: return Theme.Colors.googleAccent
+            case .kilo: return Theme.Colors.kiloAccent
             case .custom: return Theme.Colors.customAccent
             }
         }
@@ -295,6 +354,18 @@ struct ProviderListView: View {
         // Delete from SwiftData
         modelContext.delete(provider)
     }
+
+    /// Deletes all selected providers and their associated Keychain secrets.
+    private func deleteSelectedProviders() {
+        for providerID in selectedProviderIDs {
+            if let provider = providers.first(where: { $0.id == providerID }) {
+                deleteProvider(provider)
+            }
+        }
+        // Clear selection and exit edit mode
+        selectedProviderIDs.removeAll()
+        isEditMode = false
+    }
 }
 
 // MARK: - ProviderType Display Name Extension
@@ -320,6 +391,7 @@ extension ProviderType {
         case .xAI: return "xAI (Grok)"
         case .perplexity: return "Perplexity"
         case .google: return "Google AI (Gemini)"
+        case .kilo: return "Kilo Code Gateway"
         case .custom: return "Custom Endpoint"
         }
     }

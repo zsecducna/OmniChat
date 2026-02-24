@@ -57,8 +57,18 @@ struct ContentView: View {
 
     // MARK: - Query
 
-    /// All enabled providers for looking up defaults.
-    @Query(filter: #Predicate<ProviderConfig> { $0.isEnabled }) private var enabledProviders: [ProviderConfig]
+    /// All enabled providers for looking up defaults, sorted by isDefault (descending) then sortOrder.
+    @Query(sort: [SortDescriptor(\ProviderConfig.sortOrder)]) private var allProviders: [ProviderConfig]
+
+    /// Enabled providers with default provider first.
+    private var enabledProviders: [ProviderConfig] {
+        let enabled = allProviders.filter { $0.isEnabled }
+        // Return default provider first, then others sorted by sortOrder
+        if let defaultProvider = enabled.first(where: { $0.isDefault }) {
+            return [defaultProvider] + enabled.filter { !$0.isDefault }
+        }
+        return enabled
+    }
 
     /// All personas for looking up defaults.
     @Query(sort: \Persona.sortOrder) private var allPersonas: [Persona]
@@ -129,15 +139,15 @@ struct ContentView: View {
     /// If `newConversationTitle` is non-empty, it's used as the title.
     /// Otherwise, a default title is generated.
     private func createNewConversation() {
-        // Resolve provider from stored default or fall back to first enabled provider
+        // Resolve provider from stored default or fall back to provider marked as default
         var defaultProvider: ProviderConfig?
         if let providerIDString = storedDefaultProviderID,
            let providerUUID = UUID(uuidString: providerIDString) {
             // Use the provider from user settings
             defaultProvider = enabledProviders.first { $0.id == providerUUID }
         } else {
-            // Fall back to first enabled provider
-            defaultProvider = enabledProviders.first
+            // Fall back to provider with isDefault == true, or first enabled provider
+            defaultProvider = enabledProviders.first(where: { $0.isDefault }) ?? enabledProviders.first
         }
 
         // Resolve persona from stored default or fall back to first persona
@@ -163,7 +173,8 @@ struct ContentView: View {
         if let modelID = storedDefaultModelID {
             conversation.modelID = modelID
         } else {
-            conversation.modelID = defaultProvider?.defaultModel?.id
+            // Use defaultModelID directly (defaultModel computed property requires model in availableModels)
+            conversation.modelID = defaultProvider?.defaultModelID
         }
 
         conversation.personaID = defaultPersona?.id

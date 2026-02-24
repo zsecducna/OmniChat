@@ -18,13 +18,17 @@ import os
 /// - Chat completions with streaming (NDJSON format)
 /// - Vision support via images array (base64 encoded)
 /// - Model listing via /api/tags endpoint
-/// - No authentication (local server)
+/// - Optional Bearer token authentication for cloud-hosted instances
 ///
 /// ## API Details
-/// - Base URL: `http://localhost:11434` (configurable)
+/// - Base URL: `http://localhost:11434` (configurable for cloud instances)
 /// - Chat Endpoint: `POST /api/chat`
 /// - Models Endpoint: `GET /api/tags`
-/// - No authentication required
+/// - Authentication: None (local) or Bearer token (cloud-hosted)
+///
+/// ## Cloud-Hosted Ollama
+/// For cloud-hosted Ollama instances (e.g., Ollama Cloud), an API key is required.
+/// The adapter will add `Authorization: Bearer <api_key>` header when an API key is provided.
 ///
 /// ## Streaming Format
 /// Ollama uses NDJSON (newline-delimited JSON) with the following format:
@@ -36,20 +40,15 @@ import os
 ///
 /// ## Example Usage
 /// ```swift
+/// // Local Ollama (no auth)
 /// let config = ProviderConfig(name: "Local Ollama", providerType: .ollama)
 /// let adapter = OllamaAdapter(config: config.makeSnapshot())
 ///
-/// let stream = adapter.sendMessage(
-///     messages: [ChatMessage(role: .user, content: "Hello")],
-///     model: "llama3.2",
-///     systemPrompt: nil,
-///     attachments: [],
-///     options: RequestOptions()
-/// )
+/// // Cloud-hosted Ollama (with auth)
+/// let cloudConfig = ProviderConfig(name: "Ollama Cloud", providerType: .ollama, baseURL: "https://your-cloud-ollama.com")
+/// let cloudAdapter = OllamaAdapter(config: cloudConfig.makeSnapshot(), apiKey: "your-api-key")
 ///
-/// for try await event in stream {
-///     if case .textDelta(let text) = event {
-///         print(text, terminator: "")
+/// let stream = StreamEvent, Error>" = StreamEvent, Error>"StreamEvent, Error>"type"StreamEvent" text)
 ///     }
 /// }
 /// ```
@@ -62,6 +61,10 @@ final class OllamaAdapter: AIProvider, Sendable {
 
     /// The HTTP client for making requests.
     private let httpClient: HTTPClient
+
+    /// Optional API key for cloud-hosted Ollama instances.
+    /// When provided, adds `Authorization: Bearer <api_key>` header to requests.
+    private let apiKey: String?
 
     /// Logger for Ollama adapter operations.
     private static let logger = Logger(subsystem: Constants.BundleID.base, category: "OllamaAdapter")
@@ -115,17 +118,45 @@ final class OllamaAdapter: AIProvider, Sendable {
 
     /// Creates a new Ollama adapter.
     ///
-    /// Ollama does not require authentication, so no API key is needed.
+    /// For local Ollama instances, no API key is needed.
+    /// For cloud-hosted Ollama instances, provide an API key for Bearer token authentication.
     ///
     /// - Parameters:
     ///   - config: The provider configuration snapshot (contains base URL, custom headers, etc.)
+    ///   - apiKey: Optional API key for cloud-hosted Ollama instances (stored securely in Keychain)
     ///   - httpClient: The HTTP client for making requests (defaults to new instance)
     init(
         config: ProviderConfigSnapshot,
+        apiKey: String? = nil,
         httpClient: HTTPClient = HTTPClient()
     ) {
         self.config = config
+        self.apiKey = apiKey
         self.httpClient = httpClient
+    }
+
+    // MARK: - Header Building
+
+    /// Builds the HTTP headers for Ollama requests.
+    ///
+    /// For local instances, no authentication is required.
+    /// For cloud instances with an API key, adds Bearer token authentication.
+    private func buildHeaders() -> [String: String] {
+        var headers: [String: String] = [
+            "Content-Type": "application/json"
+        ]
+
+        // Add Bearer token if API key is provided (for cloud-hosted Ollama)
+        if let apiKey = apiKey, !apiKey.isEmpty {
+            headers["Authorization"] = "Bearer \(apiKey)"
+        }
+
+        // Add any custom headers from config
+        for (key, value) in config.customHeaders {
+            headers[key] = value
+        }
+
+        return headers
     }
 
     // MARK: - AIProvider Conformance
@@ -149,7 +180,7 @@ final class OllamaAdapter: AIProvider, Sendable {
             let data = try await httpClient.request(
                 url: url,
                 method: "GET",
-                headers: ["Content-Type": "application/json"]
+                headers: buildHeaders()
             )
 
             let response = try JSONDecoder().decode(OllamaTagsResponse.self, from: data)
@@ -219,6 +250,8 @@ final class OllamaAdapter: AIProvider, Sendable {
 
     /// Validates that the Ollama server is reachable.
     ///
+    /// For cloud-hosted instances, also validates the API key if provided.
+    ///
     /// - Returns: `true` if the Ollama server is running and responding, `false` otherwise.
     func validateCredentials() async -> Bool {
         let baseURL = config.effectiveBaseURL ?? Self.defaultBaseURL
@@ -233,7 +266,7 @@ final class OllamaAdapter: AIProvider, Sendable {
             _ = try await httpClient.request(
                 url: url,
                 method: "GET",
-                headers: ["Content-Type": "application/json"]
+                headers: buildHeaders()
             )
             Self.logger.debug("Ollama connection validated successfully")
             return true
@@ -278,7 +311,7 @@ final class OllamaAdapter: AIProvider, Sendable {
             )
 
             let body = try JSONEncoder().encode(requestBody)
-            let headers = ["Content-Type": "application/json"]
+            let headers = buildHeaders()
 
             Self.logger.debug("Starting Ollama streaming request to model: \(model)")
 

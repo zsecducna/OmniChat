@@ -219,6 +219,8 @@ struct DefaultsSettingsView: View {
             return Theme.Colors.perplexityAccent
         case .google:
             return Theme.Colors.googleAccent
+        case .kilo:
+            return Theme.Colors.kiloAccent
         case .custom:
             return Theme.Colors.customAccent
         }

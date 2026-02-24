@@ -283,6 +283,37 @@ enum CostCalculator: Sendable {
         return .free
     }
 
+    // MARK: - Subscription Provider Check
+
+    /// Returns whether cost calculation should be skipped for a provider type.
+    ///
+    /// Some providers use fixed subscription billing rather than per-token billing.
+    /// For these providers, token counts are still tracked but cost is set to 0.
+    ///
+    /// - Parameter providerType: The provider type to check.
+    /// - Returns: `true` if cost calculation should be skipped (subscription model).
+    static func shouldSkipCostCalculation(for providerType: ProviderType) -> Bool {
+        switch providerType {
+        case .zhipu, .zhipuCoding, .zhipuAnthropic:
+            // Z.AI uses GLM models via fixed subscription, not per-token billing
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Returns whether cost calculation should be skipped for a model ID.
+    ///
+    /// Checks if the model belongs to a subscription-based provider.
+    ///
+    /// - Parameter modelID: The model ID to check.
+    /// - Returns: `true` if cost calculation should be skipped.
+    static func shouldSkipCostCalculation(forModel modelID: String) -> Bool {
+        let lowercasedID = modelID.lowercased()
+        // Z.AI GLM models
+        return lowercasedID.contains("glm-") || lowercasedID.hasPrefix("glm")
+    }
+
     // MARK: - Formatting Helpers
 
     /// Formats a cost value for display.

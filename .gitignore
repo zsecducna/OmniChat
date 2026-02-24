@@ -75,3 +75,14 @@ Temporary Items
 *.key
 *.mobileprovision
 *.provisionprofile
+
+# Claude
+*.claude/
+AGENTS.md
+CLAUDE.md
+MASTER_PLAN.md
+SETUP_GUIDE.md
+
+# Build Output
+BuildOutput/
+CleanBuild/

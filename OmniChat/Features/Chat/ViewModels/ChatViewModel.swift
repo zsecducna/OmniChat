@@ -81,6 +81,40 @@ final class ChatViewModel {
     /// The most recent error, if any.
     var error: ProviderError?
 
+    // MARK: - Live Token Tracking
+
+    /// The current input token count from the streaming response.
+    /// Updated in real-time during streaming.
+    var currentInputTokens: Int = 0
+
+    /// The current output token count from the streaming response.
+    /// Updated in real-time during streaming.
+    var currentOutputTokens: Int = 0
+
+    /// The estimated cost for the current streaming response.
+    /// Calculated from input/output tokens using CostCalculator.
+    var currentUsageCost: Double {
+        guard let conversation = currentConversation,
+              let providerID = conversation.providerConfigID else {
+            return 0
+        }
+
+        // Get the model ID
+        let modelID = selectedModel ?? conversation.modelID ?? effectiveModelID
+
+        // Check if cost calculation should be skipped for this provider
+        if let providerConfig = currentProviderConfig,
+           CostCalculator.shouldSkipCostCalculation(for: providerConfig.providerType) {
+            return 0
+        }
+
+        return CostCalculator.calculateCost(
+            inputTokens: currentInputTokens,
+            outputTokens: currentOutputTokens,
+            modelID: modelID
+        )
+    }
+
     /// The model context for SwiftData operations.
     private let modelContext: ModelContext
 
@@ -184,8 +218,24 @@ final class ChatViewModel {
     }
 
     /// The model ID to use for requests.
+    ///
+    /// Resolution order:
+    /// 1. User-selected model (temporary selection in UI)
+    /// 2. Conversation's stored modelID
+    /// 3. Provider's default model ID (from ProviderConfig.defaultModelID)
     var effectiveModelID: String {
-        selectedModel ?? currentConversation?.modelID ?? "claude-sonnet-4-5-20250929"
+        if let selected = selectedModel {
+            return selected
+        }
+        if let modelID = currentConversation?.modelID {
+            return modelID
+        }
+        // Fall back to provider's default model
+        if let defaultModelID = currentProviderConfig?.defaultModelID {
+            return defaultModelID
+        }
+        // Final fallback - should rarely happen if providers are configured correctly
+        return "minimax/minimax-m2.5:free"
     }
 
     /// Whether there are any messages in the conversation.
@@ -294,6 +344,8 @@ final class ChatViewModel {
         // Start streaming
         isStreaming = true
         streamingText = ""
+        currentInputTokens = 0
+        currentOutputTokens = 0
 
         // Track start time for duration calculation
         let startTime = Date()
@@ -330,10 +382,16 @@ final class ChatViewModel {
 
                     case .inputTokenCount(let count):
                         result.inputTokens = count
+                        await MainActor.run {
+                            self.currentInputTokens = count
+                        }
                         Self.logger.debug("Input tokens: \(count)")
 
                     case .outputTokenCount(let count):
                         result.outputTokens = count
+                        await MainActor.run {
+                            self.currentOutputTokens = count
+                        }
 
                     case .modelUsed(let model):
                         result.responseModel = model
@@ -415,6 +473,8 @@ final class ChatViewModel {
         // Reset streaming state
         isStreaming = false
         streamingText = ""
+        currentInputTokens = 0
+        currentOutputTokens = 0
         currentTask = nil
     }
 
@@ -429,6 +489,8 @@ final class ChatViewModel {
 
         isStreaming = false
         streamingText = ""
+        currentInputTokens = 0
+        currentOutputTokens = 0
         currentTask = nil
     }
 
@@ -575,6 +637,7 @@ final class ChatViewModel {
     ///
     /// Uses model-level pricing from CostCalculator for accurate cost estimation.
     /// Falls back to provider-level pricing if model pricing is not available.
+    /// For subscription-based providers (Z.AI), cost is set to 0.
     ///
     /// - Parameters:
     ///   - inputTokens: Number of input tokens used.
@@ -592,13 +655,23 @@ final class ChatViewModel {
             return
         }
 
+        // Check if this provider uses subscription billing (skip cost calculation)
+        let shouldSkipCost = CostCalculator.shouldSkipCostCalculation(for: providerConfig.providerType)
+
         // Calculate cost using model-level pricing from CostCalculator
         // This provides accurate per-model pricing based on the official rates
-        let cost = CostCalculator.calculateCost(
-            inputTokens: inputTokens,
-            outputTokens: outputTokens,
-            modelID: modelID
-        )
+        // For subscription providers, cost is 0
+        let cost: Double
+        if shouldSkipCost {
+            cost = 0
+            Self.logger.debug("Skipping cost calculation for subscription provider: \(providerConfig.providerType.displayName)")
+        } else {
+            cost = CostCalculator.calculateCost(
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                modelID: modelID
+            )
+        }
 
         // Update conversation totals
         conversation.totalInputTokens += inputTokens

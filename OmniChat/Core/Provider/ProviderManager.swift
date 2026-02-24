@@ -93,15 +93,67 @@ final class ProviderManager {
     ///
     /// Providers are sorted by their `sortOrder` property.
     /// If loading fails, an empty array is used and an error is logged.
+    /// If no providers exist, creates default providers.
     func loadProviders() {
         let descriptor = FetchDescriptor<ProviderConfig>(sortBy: [SortDescriptor(\.sortOrder)])
 
         do {
             providers = try modelContext.fetch(descriptor)
             Self.logger.debug("Loaded \(self.providers.count) provider(s)")
+
+            // Create default providers if no providers exist
+            if providers.isEmpty {
+                Self.logger.info("No providers found, creating default providers")
+            }
         } catch {
             Self.logger.error("Failed to load providers: \(error.localizedDescription)")
             providers = []
+        }
+
+        // Ensure Kilo Code (Free) is always available (called once after load attempt)
+        ensurePreconfiguredProviders()
+    }
+
+    // MARK: - Default Providers
+
+    /// Ensures Kilo Code (Free) provider exists and is enabled.
+    /// Called every time the app loads to guarantee a free tier option.
+    private func ensurePreconfiguredProviders() {
+        // Check if an enabled Kilo Code provider exists
+        let enabledKiloExists = providers.contains { $0.providerType == .kilo && $0.isEnabled }
+
+        guard !enabledKiloExists else {
+            Self.logger.debug("Kilo Code (Free) already configured and enabled")
+            return
+        }
+
+        // Check if a disabled Kilo Code exists - if so, enable it
+        if let disabledKilo = providers.first(where: { $0.providerType == .kilo && !$0.isEnabled }) {
+            disabledKilo.isEnabled = true
+            Self.logger.info("Re-enabled preconfigured provider: Kilo Code (Free)")
+            return
+        }
+
+        // Create new Kilo Code free tier provider (no API key needed)
+        let kiloProvider = ProviderConfig(
+            name: "Kilo Code (Free)",
+            providerType: .kilo,
+            isEnabled: true,
+            isDefault: !providers.contains { $0.isDefault }, // Only default if no other default exists
+            sortOrder: 0,
+            availableModels: [],
+            defaultModelID: "minimax/minimax-m2.5:free"
+        )
+
+        modelContext.insert(kiloProvider)
+        providers.insert(kiloProvider, at: 0) // Insert at beginning
+
+        // Save to SwiftData immediately
+        do {
+            try modelContext.save()
+            Self.logger.info("Created preconfigured provider: Kilo Code (Free)")
+        } catch {
+            Self.logger.error("Failed to save Kilo Code provider: \(error.localizedDescription)")
         }
     }
 
@@ -173,9 +225,14 @@ final class ProviderManager {
             Self.logger.debug("Created OpenAI adapter for '\(config.name)'")
 
         case .ollama:
-            // Ollama does not require authentication
-            adapter = OllamaAdapter(config: snapshot)
-            Self.logger.debug("Created Ollama adapter for '\(config.name)'")
+            // Ollama supports optional authentication for cloud-hosted instances
+            // Local Ollama does not require authentication, but cloud Ollama does
+            adapter = OllamaAdapter(config: snapshot, apiKey: apiKey.isEmpty ? nil : apiKey)
+            if apiKey.isEmpty {
+                Self.logger.debug("Created Ollama adapter for '\(config.name)' (local, no auth)")
+            } else {
+                Self.logger.debug("Created Ollama adapter for '\(config.name)' (cloud with auth)")
+            }
 
         case .zhipu:
             adapter = try ZhipuAdapter(config: snapshot, apiKey: apiKey)
@@ -191,9 +248,19 @@ final class ProviderManager {
             adapter = AnthropicAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created Z.AI Anthropic adapter for '\(config.name)'")
 
+        // Kilo Code - uses KiloCodeAdapter with optional API key
+        case .kilo:
+            adapter = KiloCodeAdapter(config: snapshot, apiKey: apiKey.isEmpty ? nil : apiKey)
+            Self.logger.debug("Created Kilo Code adapter for '\(config.name)'")
+
+        // OpenRouter - use dedicated adapter with app attribution headers
+        case .openRouter:
+            adapter = try OpenRouterAdapter(config: snapshot, apiKey: apiKey)
+            Self.logger.debug("Created OpenRouter adapter for '\(config.name)'")
+
         // OpenAI-compatible providers - use OpenAIAdapter with custom baseURL
         case .groq, .cerebras, .mistral, .deepSeek, .together,
-             .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
+             .fireworks, .siliconFlow, .xAI, .perplexity, .google:
             adapter = try OpenAIAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created \(config.providerType.displayName) adapter (OpenAI-compatible) for '\(config.name)'")
 
