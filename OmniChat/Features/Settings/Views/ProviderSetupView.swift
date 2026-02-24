@@ -1498,9 +1498,18 @@ struct ProviderSetupView: View {
             }
         case .ollama:
             // For local Ollama, no auth is needed
-            // For cloud Ollama, API key is required
+            // For cloud Ollama, at least one valid API key is required
             if ollamaMode == .cloud {
-                return !apiKey.isEmpty && connectionTestResult?.isSuccess == true
+                // Check if there's at least one API key
+                guard !ollamaAPIKeys.isEmpty else { return false }
+                // Check if the active key has been tested and is valid
+                if let activeKey = ollamaAPIKeys.first(where: { $0.isActive }) {
+                    if let result = apiKeyTestResults[activeKey.id], case .success = result {
+                        return true
+                    }
+                }
+                // Alternatively, if any key is valid, allow proceeding
+                return apiKeyTestResults.values.contains { if case .success = $0 { return true }; return false }
             }
             return true
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
