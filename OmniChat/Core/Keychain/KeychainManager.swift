@@ -56,14 +56,30 @@ struct APIKeyEntry: Identifiable, Codable, Sendable, Hashable {
     var isActive: Bool
     /// Whether this key passed the last validation test.
     var isValid: Bool?
+    /// Total tokens used with this key (for round-robin balancing).
+    var totalTokens: Int
 
     /// Creates a new API key entry.
-    init(id: UUID = UUID(), label: String, key: String, isActive: Bool = false, isValid: Bool? = nil) {
+    init(id: UUID = UUID(), label: String, key: String, isActive: Bool = false, isValid: Bool? = nil, totalTokens: Int = 0) {
         self.id = id
         self.label = label
         self.key = key
         self.isActive = isActive
         self.isValid = isValid
+        self.totalTokens = totalTokens
+    }
+}
+
+/// Container for multiple API keys with round-robin configuration.
+struct APIKeysConfig: Codable, Sendable {
+    /// The list of API key entries.
+    var keys: [APIKeyEntry]
+    /// Whether to use round-robin selection based on token usage.
+    var useRoundRobin: Bool
+
+    init(keys: [APIKeyEntry] = [], useRoundRobin: Bool = false) {
+        self.keys = keys
+        self.useRoundRobin = useRoundRobin
     }
 }
 
@@ -356,11 +372,11 @@ final class KeychainManager: Sendable {
     ///
     /// - Parameters:
     ///   - providerID: The UUID of the provider.
-    ///   - keys: Array of API key entries to store.
+    ///   - config: API keys configuration including keys and round-robin setting.
     /// - Throws: `KeychainError` cases for operation failures.
-    func saveMultipleAPIKeys(providerID: UUID, keys: [APIKeyEntry]) throws {
+    func saveAPIKeysConfig(providerID: UUID, config: APIKeysConfig) throws {
         let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(keys) else {
+        guard let data = try? encoder.encode(config) else {
             throw KeychainError.invalidData
         }
         // Store as base64 string to avoid encoding issues
@@ -368,23 +384,47 @@ final class KeychainManager: Sendable {
         try save(key: "omnichat.provider.\(providerID.uuidString).apikeys", value: base64String)
     }
 
-    /// Reads multiple API keys for a provider.
+    /// Reads API keys configuration for a provider.
     ///
     /// - Parameter providerID: The UUID of the provider.
-    /// - Returns: Array of API key entries, or empty array if none stored.
+    /// - Returns: API keys configuration, or empty config if none stored.
     /// - Throws: `KeychainError` cases for operation failures.
-    func readMultipleAPIKeys(providerID: UUID) throws -> [APIKeyEntry] {
+    func readAPIKeysConfig(providerID: UUID) throws -> APIKeysConfig {
         guard let base64String = try read(key: "omnichat.provider.\(providerID.uuidString).apikeys") else {
-            return []
+            return APIKeysConfig()
         }
         guard let data = Data(base64Encoded: base64String) else {
             throw KeychainError.decodingFailed
         }
         let decoder = JSONDecoder()
-        guard let keys = try? decoder.decode([APIKeyEntry].self, from: data) else {
-            throw KeychainError.decodingFailed
+        // Try to decode as APIKeysConfig first, fall back to old format
+        if let config = try? decoder.decode(APIKeysConfig.self, from: data) {
+            return config
         }
-        return keys
+        // Fallback: try old format (just array of keys)
+        if let keys = try? decoder.decode([APIKeyEntry].self, from: data) {
+            return APIKeysConfig(keys: keys, useRoundRobin: false)
+        }
+        throw KeychainError.decodingFailed
+    }
+
+    /// Saves multiple API keys for a provider (backward compatibility).
+    ///
+    /// - Parameters:
+    ///   - providerID: The UUID of the provider.
+    ///   - keys: Array of API key entries to store.
+    /// - Throws: `KeychainError` cases for operation failures.
+    func saveMultipleAPIKeys(providerID: UUID, keys: [APIKeyEntry]) throws {
+        try saveAPIKeysConfig(providerID: providerID, config: APIKeysConfig(keys: keys, useRoundRobin: false))
+    }
+
+    /// Reads multiple API keys for a provider (backward compatibility).
+    ///
+    /// - Parameter providerID: The UUID of the provider.
+    /// - Returns: Array of API key entries, or empty array if none stored.
+    /// - Throws: `KeychainError` cases for operation failures.
+    func readMultipleAPIKeys(providerID: UUID) throws -> [APIKeyEntry] {
+        return try readAPIKeysConfig(providerID: providerID).keys
     }
 
     /// Deletes all multiple API keys for a provider.
@@ -401,6 +441,31 @@ final class KeychainManager: Sendable {
     /// - Returns: `true` if multiple API keys are stored, `false` otherwise.
     func hasMultipleAPIKeys(providerID: UUID) -> Bool {
         return exists(key: "omnichat.provider.\(providerID.uuidString).apikeys")
+    }
+
+    /// Updates token usage for a specific API key.
+    ///
+    /// - Parameters:
+    ///   - providerID: The UUID of the provider.
+    ///   - keyID: The UUID of the API key entry.
+    ///   - tokens: The number of tokens to add.
+    /// - Throws: `KeychainError` cases for operation failures.
+    func updateAPIKeyTokenUsage(providerID: UUID, keyID: UUID, tokens: Int) throws {
+        var config = try readAPIKeysConfig(providerID: providerID)
+        if let index = config.keys.firstIndex(where: { $0.id == keyID }) {
+            config.keys[index].totalTokens += tokens
+            try saveAPIKeysConfig(providerID: providerID, config: config)
+        }
+    }
+
+    /// Gets the API key with the lowest token usage for round-robin selection.
+    ///
+    /// - Parameter providerID: The UUID of the provider.
+    /// - Returns: The API key entry with the lowest token usage, or nil if no keys.
+    /// - Throws: `KeychainError` cases for operation failures.
+    func getNextRoundRobinKey(providerID: UUID) throws -> APIKeyEntry? {
+        let config = try readAPIKeysConfig(providerID: providerID)
+        return config.keys.min(by: { $0.totalTokens < $1.totalTokens })
     }
 
     // MARK: - Private Helpers

@@ -154,6 +154,9 @@ struct ProviderSetupView: View {
     /// Whether we're currently testing all API keys
     @State private var isTestingAllKeys = false
 
+    /// Whether to use round-robin key selection based on token usage
+    @State private var useRoundRobinKeySelection = false
+
     // MARK: - Validation State
 
     @State private var isValidating = false
@@ -1199,7 +1202,31 @@ struct ProviderSetupView: View {
             } header: {
                 Text("API Keys")
             } footer: {
-                Text("Add multiple API keys for load balancing. Select which key to use as active.")
+                if useRoundRobinKeySelection {
+                    Text("Round-robin enabled: Keys will be selected automatically based on token usage.")
+                } else {
+                    Text("Add multiple API keys. Select which key to use, or enable round-robin below.")
+                }
+            }
+
+            // Round-Robin Key Selection
+            Section {
+                Toggle(isOn: $useRoundRobinKeySelection) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dynamic Key Selection")
+                            .font(Theme.Typography.body)
+                        Text("Automatically balance token usage across all keys")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
+                }
+                .disabled(ollamaAPIKeys.count < 2)
+            } footer: {
+                if ollamaAPIKeys.count < 2 {
+                    Text("Add at least 2 API keys to enable round-robin selection")
+                } else if useRoundRobinKeySelection {
+                    Text("Keys will be rotated automatically to balance token usage. The key with the lowest usage will be selected for each request.")
+                }
             }
         }
 
@@ -1813,12 +1840,14 @@ struct ProviderSetupView: View {
             case .ollama:
                 // Load multiple API keys for Ollama Cloud
                 if ollamaMode == .cloud {
-                    // Try to load multiple keys first
-                    if let keys = try? KeychainManager.shared.readMultipleAPIKeys(providerID: provider.id), !keys.isEmpty {
-                        ollamaAPIKeys = keys
+                    // Try to load API keys config first
+                    if let config = try? KeychainManager.shared.readAPIKeysConfig(providerID: provider.id), !config.keys.isEmpty {
+                        ollamaAPIKeys = config.keys
+                        useRoundRobinKeySelection = config.useRoundRobin
                     } else if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
                         // Fallback: migrate single key to new format
                         ollamaAPIKeys = [APIKeyEntry(label: "Primary", key: key, isActive: true)]
+                        useRoundRobinKeySelection = false
                     }
                 }
                 isValidated = true
@@ -1987,7 +2016,8 @@ struct ProviderSetupView: View {
                 HStack {
                     Text(keyEntry.label)
                         .font(Theme.Typography.body)
-                    if keyEntry.isActive {
+                    // Show "Active" badge only when NOT using round-robin
+                    if !useRoundRobinKeySelection && keyEntry.isActive {
                         Text("Active")
                             .font(Theme.Typography.caption)
                             .padding(.horizontal, 6)
@@ -2026,8 +2056,8 @@ struct ProviderSetupView: View {
             }
             Spacer()
 
-            // Select as active button
-            if !keyEntry.isActive {
+            // Select as active button - only show when NOT using round-robin
+            if !useRoundRobinKeySelection && !keyEntry.isActive {
                 Button {
                     setActiveAPIKey(keyEntry.id)
                 } label: {
@@ -2163,7 +2193,7 @@ struct ProviderSetupView: View {
                             // Check if it's an auth error vs model not found
                             if error.lowercased().contains("unauthorized") ||
                                error.lowercased().contains("invalid") ||
-                               error.lowercased().contains("auth") {
+                               error.lowercased().contains("authentication") {
                                 return .failure("Invalid key")
                             }
                             // Model not found or other error - key is valid
@@ -2173,8 +2203,31 @@ struct ProviderSetupView: View {
                     }
                     return .success
                 case 401, 403:
+                    // Unauthorized - key is invalid
                     return .failure("Invalid key")
+                case 404:
+                    // Not found - could be model not found, but key is valid
+                    // Check response body for auth errors
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let error = json["error"] as? String {
+                        if error.lowercased().contains("unauthorized") ||
+                           error.lowercased().contains("invalid") ||
+                           error.lowercased().contains("authentication") {
+                            return .failure("Invalid key")
+                        }
+                    }
+                    // 404 with no auth error means key is valid, just model/endpoint not found
+                    return .success
                 default:
+                    // For other status codes, check if it's an auth error in the body
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let error = json["error"] as? String {
+                        if error.lowercased().contains("unauthorized") ||
+                           error.lowercased().contains("invalid") ||
+                           error.lowercased().contains("authentication") {
+                            return .failure("Invalid key")
+                        }
+                    }
                     return .failure("Status \(httpResponse.statusCode)")
                 }
             }
@@ -2623,9 +2676,10 @@ struct ProviderSetupView: View {
                     if let activeKey = ollamaAPIKeys.first(where: { $0.isActive }) {
                         try KeychainManager.shared.saveAPIKey(activeKey.key, providerID: config.id)
                     }
-                    // Save all keys (including labels and active state) for multi-key support
-                    try KeychainManager.shared.saveMultipleAPIKeys(providerID: config.id, keys: ollamaAPIKeys)
-                    Self.logger.info("Successfully saved \(ollamaAPIKeys.count) API key(s) for Ollama Cloud '\(config.name)'")
+                    // Save all keys with round-robin config
+                    let config2 = APIKeysConfig(keys: ollamaAPIKeys, useRoundRobin: useRoundRobinKeySelection)
+                    try KeychainManager.shared.saveAPIKeysConfig(providerID: config.id, config: config2)
+                    Self.logger.info("Successfully saved \(ollamaAPIKeys.count) API key(s) for Ollama Cloud '\(config.name)' (roundRobin: \(useRoundRobinKeySelection))")
                 } catch {
                     Self.logger.error("Failed to save API keys for '\(config.name)': \(error.localizedDescription)")
                 }

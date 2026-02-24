@@ -115,6 +115,13 @@ final class ChatViewModel {
         )
     }
 
+    /// The label of the currently active API key (for display in chat view).
+    /// Used when round-robin key selection is enabled for Ollama Cloud.
+    var currentAPIKeyLabel: String?
+
+    /// The ID of the currently active API key (for token tracking).
+    private var currentAPIKeyID: UUID?
+
     /// The model context for SwiftData operations.
     private let modelContext: ModelContext
 
@@ -297,6 +304,9 @@ final class ChatViewModel {
                 return
             }
         }
+
+        // Handle round-robin key selection for Ollama Cloud
+        await selectRoundRobinKeyIfNeeded(for: conversation)
 
         guard let provider = currentProvider else {
             Self.logger.error("No provider available for sending message")
@@ -692,6 +702,82 @@ final class ChatViewModel {
         modelContext.insert(usageRecord)
 
         Self.logger.debug("Recorded usage: \(inputTokens) input, \(outputTokens) output, \(CostCalculator.formatCost(cost)) for model \(modelID)")
+
+        // Update round-robin key token usage if applicable
+        if let keyID = currentAPIKeyID {
+            let providerID = providerConfig.id
+            do {
+                try KeychainManager.shared.updateAPIKeyTokenUsage(
+                    providerID: providerID,
+                    keyID: keyID,
+                    tokens: inputTokens + outputTokens
+                )
+            } catch {
+                Self.logger.warning("Failed to update round-robin token usage: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Round-Robin Key Selection
+
+    /// Selects the next API key for round-robin if enabled.
+    ///
+    /// For Ollama Cloud with round-robin enabled, this selects the key with
+    /// the lowest token usage and sets it as the active key.
+    private func selectRoundRobinKeyIfNeeded(for conversation: Conversation) async {
+        guard let providerConfig = currentProviderConfig,
+              providerConfig.providerType == .ollama,
+              conversation.providerConfigID != nil else {
+            currentAPIKeyLabel = nil
+            currentAPIKeyID = nil
+            return
+        }
+
+        // Check if this is Ollama Cloud (has ollama.com in base URL)
+        let baseURL = providerConfig.baseURL ?? ""
+        guard baseURL.contains("ollama.com") else {
+            currentAPIKeyLabel = nil
+            currentAPIKeyID = nil
+            return
+        }
+
+        // Load API keys config
+        let config = try? KeychainManager.shared.readAPIKeysConfig(providerID: providerConfig.id)
+
+        guard let config = config, !config.keys.isEmpty else {
+            currentAPIKeyLabel = nil
+            currentAPIKeyID = nil
+            return
+        }
+
+        // If not using round-robin, use the active key
+        guard config.useRoundRobin else {
+            if let activeKey = config.keys.first(where: { $0.isActive }) {
+                currentAPIKeyLabel = activeKey.label
+                currentAPIKeyID = activeKey.id
+            }
+            return
+        }
+
+        // Get the key with lowest token usage
+        guard let selectedKey = config.keys.min(by: { $0.totalTokens < $1.totalTokens }) else {
+            return
+        }
+
+        Self.logger.debug("Round-robin selected key '\(selectedKey.label)' with \(selectedKey.totalTokens) tokens")
+
+        // Update the active key in Keychain for adapter creation
+        currentAPIKeyLabel = selectedKey.label
+        currentAPIKeyID = selectedKey.id
+
+        // Save the selected key as the primary API key
+        do {
+            try KeychainManager.shared.saveAPIKey(providerID: providerConfig.id, apiKey: selectedKey.key)
+            // Clear adapter cache to force refresh with new key
+            providerManager.clearAdapterCache(for: providerConfig.id)
+        } catch {
+            Self.logger.error("Failed to set round-robin key: \(error.localizedDescription)")
+        }
     }
 }
 
