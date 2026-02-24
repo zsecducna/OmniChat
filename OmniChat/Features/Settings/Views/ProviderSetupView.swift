@@ -61,6 +61,30 @@ enum SetupStep: Int, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Ollama Mode
+
+/// Ollama connection mode for local vs cloud configuration.
+enum OllamaMode: String, CaseIterable, Identifiable {
+    case local
+    case cloud
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .local: return "Local"
+        case .cloud: return "Cloud"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .local: return "Run Ollama on your machine"
+        case .cloud: return "Use Ollama's hosted service"
+        }
+    }
+}
+
 // MARK: - ProviderSetupView
 
 /// Multi-step form for configuring a new or existing AI provider.
@@ -111,6 +135,11 @@ struct ProviderSetupView: View {
     @State private var apiFormat: APIFormat = .openAI
     @State private var streamingFormat: StreamingFormat = .sse
     @State private var customHeaders: [(key: String, value: String)] = []
+
+    // MARK: - Ollama Configuration State
+
+    /// Ollama connection mode: local server or cloud
+    @State private var ollamaMode: OllamaMode = .local
 
     // MARK: - Validation State
 
@@ -1058,37 +1087,70 @@ struct ProviderSetupView: View {
 
     // MARK: - Ollama Configuration Section
 
-    /// Returns whether the current Ollama URL is for a cloud instance.
-    /// Cloud instances require API key authentication.
-    private var isOllamaCloudInstance: Bool {
-        let url = baseURL.lowercased()
-        // Check if URL is not localhost or 127.0.0.1
-        let isLocalhost = url.contains("localhost") || url.contains("127.0.0.1") || url.isEmpty
-        return !isLocalhost
-    }
+    /// Ollama Cloud base URL
+    private let ollamaCloudBaseURL = "https://ollama.com/api"
+
+    /// Default local Ollama URL
+    private let ollamaLocalBaseURL = "http://localhost:11434"
 
     @ViewBuilder
     private var ollamaConfigurationSection: some View {
+        // Mode Picker - Local vs Cloud
         Section {
-            TextField("Base URL", text: $baseURL)
-                .textContentType(.URL)
-                #if os(iOS)
-                .keyboardType(.URL)
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-                #endif
+            Picker("Connection Mode", selection: $ollamaMode) {
+                ForEach(OllamaMode.allCases) { mode in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(mode.title)
+                            .font(Theme.Typography.body)
+                        Text(mode.description)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
+                    .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
         } header: {
-            Text("Server URL")
-        } footer: {
-            if isOllamaCloudInstance {
-                Text("Cloud-hosted Ollama requires an API key for authentication")
-            } else {
-                Text("Default: http://localhost:11434 - Local Ollama runs without authentication")
+            Text("Connection Type")
+        }
+
+        // Local Configuration
+        if ollamaMode == .local {
+            Section {
+                TextField("Base URL", text: $baseURL)
+                    .textContentType(.URL)
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            } header: {
+                Text("Server URL")
+            } footer: {
+                Text("Default: \(ollamaLocalBaseURL) - Local Ollama runs without authentication")
+            }
+            .onAppear {
+                if baseURL.isEmpty {
+                    baseURL = ollamaLocalBaseURL
+                }
             }
         }
 
-        // API Key for cloud-hosted Ollama
-        if isOllamaCloudInstance {
+        // Cloud Configuration
+        if ollamaMode == .cloud {
+            Section {
+                HStack {
+                    Text(ollamaCloudBaseURL)
+                        .font(Theme.Typography.body)
+                        .foregroundStyle(Theme.Colors.secondaryText)
+                    Spacer()
+                }
+            } header: {
+                Text("Server URL")
+            } footer: {
+                Text("Ollama Cloud endpoint")
+            }
+
             Section {
                 SecureField("API Key", text: $apiKey)
                     .textContentType(.password)
@@ -1103,6 +1165,7 @@ struct ProviderSetupView: View {
             }
         }
 
+        // Connection Test
         Section {
             Button {
                 testOllamaConnection()
@@ -1117,7 +1180,7 @@ struct ProviderSetupView: View {
                     }
                 }
             }
-            .disabled(isTestingConnection || (isOllamaCloudInstance && apiKey.isEmpty))
+            .disabled(isTestingConnection || (ollamaMode == .cloud && apiKey.isEmpty))
 
             if let result = connectionTestResult {
                 switch result {
@@ -1134,18 +1197,36 @@ struct ProviderSetupView: View {
         } header: {
             Text("Connection")
         } footer: {
-            if isOllamaCloudInstance {
-                Text("Test your cloud Ollama connection with the provided API key")
+            if ollamaMode == .cloud {
+                Text("Test your Ollama Cloud connection with the provided API key")
             } else {
                 Text("Make sure Ollama is running on your machine before testing")
             }
         }
 
+        // About Section
         Section {
-            if isOllamaCloudInstance {
-                Text("Ollama Cloud is a hosted version of Ollama. Enter your server URL and API key to connect.")
+            if ollamaMode == .cloud {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ollama Cloud is a hosted version of Ollama. Use your API key to access cloud-hosted models.")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.secondaryText)
+
+                    Text("Key Endpoints:")
+                        .font(Theme.Typography.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Theme.Colors.secondaryText)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• /api/generate - Simple completions")
+                        Text("• /api/chat - Conversational AI")
+                        Text("• /api/embeddings - Vector embeddings")
+                        Text("• /api/list - List available models")
+                        Text("• /api/pull - Download models")
+                    }
                     .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Colors.secondaryText)
+                    .foregroundStyle(Theme.Colors.tertiaryText)
+                }
             } else {
                 Text("Ollama is a local LLM server that runs entirely on your machine. No API key or authentication is required for local instances.")
                     .font(Theme.Typography.caption)
@@ -1153,6 +1234,15 @@ struct ProviderSetupView: View {
             }
         } header: {
             Text("About Ollama")
+        }
+    }
+
+    /// Returns the effective base URL based on Ollama mode.
+    private var effectiveOllamaBaseURL: String {
+        if ollamaMode == .cloud {
+            return ollamaCloudBaseURL
+        } else {
+            return baseURL.isEmpty ? ollamaLocalBaseURL : baseURL
         }
     }
 
@@ -1334,7 +1424,7 @@ struct ProviderSetupView: View {
         case .ollama:
             // For local Ollama, no auth is needed
             // For cloud Ollama, API key is required
-            if isOllamaCloudInstance {
+            if ollamaMode == .cloud {
                 return !apiKey.isEmpty && connectionTestResult?.isSuccess == true
             }
             return true
@@ -1601,6 +1691,16 @@ struct ProviderSetupView: View {
         availableModels = provider.availableModels
         selectedAuthMethod = provider.authMethod
 
+        // Determine Ollama mode based on base URL
+        if providerType == .ollama {
+            let url = baseURL.lowercased()
+            if url.contains("ollama.com") || url.contains("cloud") {
+                ollamaMode = .cloud
+            } else {
+                ollamaMode = .local
+            }
+        }
+
         // Load custom headers for custom providers
         if providerType == .custom {
             customHeaders = provider.customHeaders.map { (key: $0.key, value: $0.value) }
@@ -1726,9 +1826,8 @@ struct ProviderSetupView: View {
         isTestingConnection = true
         connectionTestResult = nil
 
-        let effectiveURL = baseURL.trimmingCharacters(in: .whitespaces).isEmpty
-            ? ProviderType.ollama.defaultBaseURL ?? "http://localhost:11434"
-            : baseURL
+        // Use effectiveOllamaBaseURL which accounts for mode
+        let effectiveURL = effectiveOllamaBaseURL
 
         Task {
             do {
@@ -1745,9 +1844,8 @@ struct ProviderSetupView: View {
                 request.httpMethod = "GET"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-                // Add Bearer token for cloud-hosted Ollama instances
-                let isCloud = isOllamaCloudInstance
-                if isCloud, !apiKey.isEmpty {
+                // Add Bearer token for cloud mode
+                if ollamaMode == .cloud, !apiKey.isEmpty {
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                 }
 
@@ -1758,10 +1856,6 @@ struct ProviderSetupView: View {
                         isTestingConnection = false
                         if httpResponse.statusCode == 200 {
                             connectionTestResult = .success
-                            // Update base URL if we used default
-                            if baseURL.trimmingCharacters(in: .whitespaces).isEmpty {
-                                baseURL = effectiveURL
-                            }
                         } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                             connectionTestResult = .failure("Authentication failed. Check your API key.")
                         } else {
@@ -2028,9 +2122,8 @@ struct ProviderSetupView: View {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        // Add Bearer token for cloud-hosted Ollama instances
-        let isCloud = isOllamaCloudInstance
-        if isCloud, !apiKey.isEmpty {
+        // Add Bearer token for cloud mode
+        if ollamaMode == .cloud, !apiKey.isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
 
@@ -2174,7 +2267,8 @@ struct ProviderSetupView: View {
             config = existing
             config.name = name
             config.providerType = providerType
-            config.baseURL = baseURL.isEmpty ? nil : baseURL
+            // Use effectiveOllamaBaseURL for Ollama providers
+            config.baseURL = providerType == .ollama ? (effectiveOllamaBaseURL.isEmpty ? nil : effectiveOllamaBaseURL) : (baseURL.isEmpty ? nil : baseURL)
             config.defaultModelID = selectedModelID
             config.availableModels = availableModels
             config.customHeaders = headersDict
@@ -2190,11 +2284,16 @@ struct ProviderSetupView: View {
 
             config.touch()
         } else {
+            // Use effectiveOllamaBaseURL for Ollama providers
+            let effectiveBaseURL: String? = providerType == .ollama
+                ? (effectiveOllamaBaseURL.isEmpty ? nil : effectiveOllamaBaseURL)
+                : (baseURL.isEmpty ? nil : baseURL)
+
             config = ProviderConfig(
                 name: name,
                 providerType: providerType,
                 isDefault: shouldBeDefault,
-                baseURL: baseURL.isEmpty ? nil : baseURL,
+                baseURL: effectiveBaseURL,
                 customHeaders: headersDict,
                 authMethod: authMethod,
                 oauthClientID: providerType == .custom && authMethod == .oauth ? (oauthClientID.isEmpty ? nil : oauthClientID) : nil,
