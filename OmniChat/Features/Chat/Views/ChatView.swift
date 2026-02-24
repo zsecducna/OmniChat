@@ -543,14 +543,12 @@ struct ChatView: View {
     /// Displays real-time token usage during and after streaming.
     @ViewBuilder
     private var usageMonitorView: some View {
-        // Show when streaming or when there are tokens from the last response
-        if let vm = viewModel, (vm.isStreaming || vm.currentInputTokens > 0 || vm.currentOutputTokens > 0) {
+        // Always show the usage monitor
+        if let vm = viewModel {
             HStack {
                 Spacer()
                 UsageMonitorView(
-                    inputTokens: vm.currentInputTokens,
-                    outputTokens: vm.currentOutputTokens,
-                    estimatedCost: vm.currentUsageCost,
+                    providerConfig: vm.currentProviderConfig,
                     isStreaming: vm.isStreaming
                 )
                 Spacer()
