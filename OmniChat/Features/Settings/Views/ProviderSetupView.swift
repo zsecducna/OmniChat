@@ -2130,6 +2130,8 @@ struct ProviderSetupView: View {
 
     /// Tests a single API key against the Ollama Cloud endpoint.
     private func testSingleAPIKey(_ key: String, baseURL: String) async -> ConnectionTestResult {
+        // For Ollama Cloud, we need to verify the key actually works
+        // Use /api/tags endpoint which lists models - requires valid authentication
         guard let url = URL(string: "\(baseURL)/api/tags") else {
             return .failure("Invalid URL")
         }
@@ -2138,16 +2140,29 @@ struct ProviderSetupView: View {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 10
 
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse {
-                if httpResponse.statusCode == 200 {
-                    return .success
-                } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                switch httpResponse.statusCode {
+                case 200:
+                    // Check if response contains valid data (not an error message)
+                    // Ollama returns {"models": [...]} for valid requests
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        // If there's an "error" key, the key is invalid
+                        if json["error"] != nil {
+                            return .failure("Invalid key")
+                        }
+                        // Valid response - either has models array or empty models
+                        return .success
+                    }
+                    // Can't parse JSON - might be an error
+                    return .failure("Invalid response")
+                case 401, 403:
                     return .failure("Invalid key")
-                } else {
+                default:
                     return .failure("Status \(httpResponse.statusCode)")
                 }
             }
