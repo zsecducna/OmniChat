@@ -303,9 +303,6 @@ struct ProviderSetupView: View {
             }
         }
         .formStyle(.grouped)
-        .safeAreaInset(edge: .bottom) {
-            continueButton(canProceed: !name.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
     }
 
     // MARK: - Step 2: Authentication
@@ -1493,9 +1490,6 @@ struct ProviderSetupView: View {
             }
         }
         .formStyle(.grouped)
-        .safeAreaInset(edge: .bottom) {
-            continueButton(canProceed: selectedModelID != nil)
-        }
         .onAppear {
             // Only load defaults if we're not currently fetching and have no models
             if availableModels.isEmpty && !isFetchingModels {
@@ -1545,23 +1539,6 @@ struct ProviderSetupView: View {
             .padding(.vertical, Theme.Spacing.medium.rawValue)
             .background(.ultraThinMaterial)
         }
-    }
-
-    // MARK: - Continue Button
-
-    private func continueButton(canProceed: Bool) -> some View {
-        Button {
-            advanceToNextStep()
-        } label: {
-            Text("Continue")
-                .font(Theme.Typography.headline)
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(!canProceed)
-        .padding(.horizontal, Theme.Spacing.large.rawValue)
-        .padding(.vertical, Theme.Spacing.medium.rawValue)
-        .background(.ultraThinMaterial)
     }
 
     // MARK: - Computed Properties
