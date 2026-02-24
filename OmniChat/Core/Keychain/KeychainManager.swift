@@ -42,6 +42,31 @@ enum KeychainError: Error, Sendable, CustomStringConvertible {
     }
 }
 
+/// Represents a single API key entry with metadata.
+///
+/// Used for providers that support multiple API keys (e.g., Ollama Cloud).
+struct APIKeyEntry: Identifiable, Codable, Sendable, Hashable {
+    /// Unique identifier for this key entry.
+    var id: UUID
+    /// User-defined label for this key (e.g., "Production", "Development").
+    var label: String
+    /// The actual API key value.
+    var key: String
+    /// Whether this is the currently active/selected key.
+    var isActive: Bool
+    /// Whether this key passed the last validation test.
+    var isValid: Bool?
+
+    /// Creates a new API key entry.
+    init(id: UUID = UUID(), label: String, key: String, isActive: Bool = false, isValid: Bool? = nil) {
+        self.id = id
+        self.label = label
+        self.key = key
+        self.isActive = isActive
+        self.isValid = isValid
+    }
+}
+
 /// Manages secure storage of API keys and OAuth tokens using the system Keychain.
 ///
 /// This manager provides CRUD operations for secrets with iCloud Keychain sync enabled.
@@ -321,6 +346,61 @@ final class KeychainManager: Sendable {
     func deleteAllSecrets(for providerID: UUID) throws {
         try deleteAPIKey(providerID: providerID)
         try deleteOAuthTokens(providerID: providerID)
+        // Also delete multiple API keys if they exist
+        try? deleteMultipleAPIKeys(providerID: providerID)
+    }
+
+    // MARK: - Multiple API Keys
+
+    /// Saves multiple API keys for a provider (for providers that support key rotation).
+    ///
+    /// - Parameters:
+    ///   - providerID: The UUID of the provider.
+    ///   - keys: Array of API key entries to store.
+    /// - Throws: `KeychainError` cases for operation failures.
+    func saveMultipleAPIKeys(providerID: UUID, keys: [APIKeyEntry]) throws {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(keys) else {
+            throw KeychainError.invalidData
+        }
+        // Store as base64 string to avoid encoding issues
+        let base64String = data.base64EncodedString()
+        try save(key: "omnichat.provider.\(providerID.uuidString).apikeys", value: base64String)
+    }
+
+    /// Reads multiple API keys for a provider.
+    ///
+    /// - Parameter providerID: The UUID of the provider.
+    /// - Returns: Array of API key entries, or empty array if none stored.
+    /// - Throws: `KeychainError` cases for operation failures.
+    func readMultipleAPIKeys(providerID: UUID) throws -> [APIKeyEntry] {
+        guard let base64String = try read(key: "omnichat.provider.\(providerID.uuidString).apikeys") else {
+            return []
+        }
+        guard let data = Data(base64Encoded: base64String) else {
+            throw KeychainError.decodingFailed
+        }
+        let decoder = JSONDecoder()
+        guard let keys = try? decoder.decode([APIKeyEntry].self, from: data) else {
+            throw KeychainError.decodingFailed
+        }
+        return keys
+    }
+
+    /// Deletes all multiple API keys for a provider.
+    ///
+    /// - Parameter providerID: The UUID of the provider.
+    /// - Throws: `KeychainError` cases for operation failures.
+    func deleteMultipleAPIKeys(providerID: UUID) throws {
+        try delete(key: "omnichat.provider.\(providerID.uuidString).apikeys")
+    }
+
+    /// Checks if multiple API keys exist for a provider.
+    ///
+    /// - Parameter providerID: The UUID of the provider.
+    /// - Returns: `true` if multiple API keys are stored, `false` otherwise.
+    func hasMultipleAPIKeys(providerID: UUID) -> Bool {
+        return exists(key: "omnichat.provider.\(providerID.uuidString).apikeys")
     }
 
     // MARK: - Private Helpers
