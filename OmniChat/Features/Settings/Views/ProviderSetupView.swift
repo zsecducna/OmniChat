@@ -1087,8 +1087,8 @@ struct ProviderSetupView: View {
 
     // MARK: - Ollama Configuration Section
 
-    /// Ollama Cloud base URL
-    private let ollamaCloudBaseURL = "https://ollama.com/api"
+    /// Ollama Cloud base URL (endpoints like /api/chat are appended by the adapter)
+    private let ollamaCloudBaseURL = "https://ollama.com"
 
     /// Default local Ollama URL
     private let ollamaLocalBaseURL = "http://localhost:11434"
