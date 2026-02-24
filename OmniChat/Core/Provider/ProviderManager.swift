@@ -104,51 +104,60 @@ final class ProviderManager {
             // Create default providers if no providers exist
             if providers.isEmpty {
                 Self.logger.info("No providers found, creating default providers")
-                createDefaultProviders()
             }
+
+            // Ensure Kilo Code (Free) is always available
+            ensurePreconfiguredProviders()
         } catch {
             Self.logger.error("Failed to load providers: \(error.localizedDescription)")
             providers = []
 
-            // Try to create default providers on error too
-            createDefaultProviders()
+            // Ensure Kilo Code (Free) is always available
+            ensurePreconfiguredProviders()
         }
     }
 
     // MARK: - Default Providers
 
-    /// Creates default providers for new users.
-    /// Creates Kilo Code (Free) and OpenRouter as default providers.
-    private func createDefaultProviders() {
-        // Create Kilo Code free tier provider (no API key needed)
+    /// Ensures Kilo Code (Free) provider exists and is enabled.
+    /// Called every time the app loads to guarantee a free tier option.
+    private func ensurePreconfiguredProviders() {
+        // Check if an enabled Kilo Code provider exists
+        let enabledKiloExists = providers.contains { $0.providerType == .kilo && $0.isEnabled }
+
+        guard !enabledKiloExists else {
+            Self.logger.debug("Kilo Code (Free) already configured and enabled")
+            return
+        }
+
+        // Check if a disabled Kilo Code exists - if so, enable it
+        if let disabledKilo = providers.first(where: { $0.providerType == .kilo && !$0.isEnabled }) {
+            disabledKilo.isEnabled = true
+            Self.logger.info("Re-enabled preconfigured provider: Kilo Code (Free)")
+            return
+        }
+
+        // Create new Kilo Code free tier provider (no API key needed)
         let kiloProvider = ProviderConfig(
             name: "Kilo Code (Free)",
             providerType: .kilo,
             isEnabled: true,
-            isDefault: true,
+            isDefault: !providers.contains { $0.isDefault }, // Only default if no other default exists
             sortOrder: 0,
             availableModels: [],
             defaultModelID: "minimax/minimax-m2.5:free"
         )
 
         modelContext.insert(kiloProvider)
+        providers.insert(kiloProvider, at: 0) // Insert at beginning
 
-        // Create OpenRouter provider (requires API key)
-        let openRouterProvider = ProviderConfig(
-            name: "OpenRouter",
-            providerType: .openRouter,
-            isEnabled: true,
-            isDefault: false,
-            sortOrder: 1,
-            availableModels: [],
-            defaultModelID: "openrouter/free"
-        )
-
-        modelContext.insert(openRouterProvider)
-
-        providers = [kiloProvider, openRouterProvider]
-
-        Self.logger.info("Created default providers: Kilo Code (Free) and OpenRouter")
+        // Save to SwiftData immediately
+        do {
+            try modelContext.save()
+            Self.logger.info("Created preconfigured provider: Kilo Code (Free)")
+        } catch {
+            Self.logger.error("Failed to save Kilo Code provider: \(error.localizedDescription)")
+        }
     }
 
     /// Reloads all providers from SwiftData.
