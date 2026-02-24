@@ -733,9 +733,9 @@ final class ChatViewModel {
             return
         }
 
-        // Check if this is Ollama Cloud (has ollama.com in base URL)
+        // Check if this is Ollama Cloud (base URL matches ollama.com)
         let baseURL = providerConfig.baseURL ?? ""
-        guard baseURL.contains("ollama.com") else {
+        guard baseURL == "https://ollama.com" else {
             currentAPIKeyLabel = nil
             currentAPIKeyID = nil
             return

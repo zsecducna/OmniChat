@@ -156,6 +156,7 @@ struct ProviderSetupView: View {
 
     /// Whether to use round-robin key selection based on token usage
     @State private var useRoundRobinKeySelection = false
+    @State private var apiKeyError: String?
 
     // MARK: - Validation State
 
@@ -1115,19 +1116,14 @@ struct ProviderSetupView: View {
         Section {
             Picker("Connection Mode", selection: $ollamaMode) {
                 ForEach(OllamaMode.allCases) { mode in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(mode.title)
-                            .font(Theme.Typography.body)
-                        Text(mode.description)
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(Theme.Colors.secondaryText)
-                    }
-                    .tag(mode)
+                    Text(mode.title).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
         } header: {
             Text("Connection Type")
+        } footer: {
+            Text(ollamaMode.description)
         }
 
         // Local Configuration
@@ -1148,6 +1144,13 @@ struct ProviderSetupView: View {
             .onAppear {
                 if baseURL.isEmpty {
                     baseURL = ollamaLocalBaseURL
+                }
+            }
+            .onChange(of: ollamaMode) { oldValue, newValue in
+                if newValue == .local && baseURL.isEmpty {
+                    baseURL = ollamaLocalBaseURL
+                } else if newValue == .cloud {
+                    baseURL = ollamaCloudBaseURL
                 }
             }
         }
@@ -1202,10 +1205,20 @@ struct ProviderSetupView: View {
             } header: {
                 Text("API Keys")
             } footer: {
-                if useRoundRobinKeySelection {
-                    Text("Round-robin enabled: Keys will be selected automatically based on token usage.")
-                } else {
-                    Text("Add multiple API keys. Select which key to use, or enable round-robin below.")
+                VStack(alignment: .leading, spacing: 4) {
+                    if let error = apiKeyError {
+                        Text(error)
+                            .foregroundStyle(Theme.Colors.destructive)
+                    }
+                    if useRoundRobinKeySelection {
+                        Text("Round-robin enabled: Keys will be selected automatically based on token usage.")
+                    } else {
+                        Text("Add multiple API keys. Select which key to use, or enable round-robin below.")
+                    }
+                    if ollamaAPIKeys.count >= 10 {
+                        Text("Maximum 10 API keys supported.")
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
                 }
             }
 
@@ -1804,8 +1817,7 @@ struct ProviderSetupView: View {
 
         // Determine Ollama mode based on base URL
         if providerType == .ollama {
-            let url = baseURL.lowercased()
-            if url.contains("ollama.com") || url.contains("cloud") {
+            if baseURL == ollamaCloudBaseURL {
                 ollamaMode = .cloud
             } else {
                 ollamaMode = .local
@@ -2084,12 +2096,20 @@ struct ProviderSetupView: View {
     private func addAPIKey() {
         guard !newAPIKeyValue.isEmpty && !newAPIKeyLabel.isEmpty else { return }
 
-        // If this is the first key, make it active
-        let isActive = ollamaAPIKeys.isEmpty
+        let trimmedKey = newAPIKeyValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Check for duplicate key
+        if ollamaAPIKeys.contains(where: { $0.key == trimmedKey }) {
+            apiKeyError = "This API key is already added"
+            return
+        }
+
+        // If this is the first key, make it active (unless round-robin is enabled)
+        let isActive = ollamaAPIKeys.isEmpty && !useRoundRobinKeySelection
 
         let newEntry = APIKeyEntry(
             label: newAPIKeyLabel.trimmingCharacters(in: .whitespacesAndNewlines),
-            key: newAPIKeyValue.trimmingCharacters(in: .whitespacesAndNewlines),
+            key: trimmedKey,
             isActive: isActive
         )
 
@@ -2098,6 +2118,7 @@ struct ProviderSetupView: View {
         // Clear input fields
         newAPIKeyLabel = ""
         newAPIKeyValue = ""
+        apiKeyError = nil
 
         // Clear previous test results
         apiKeyTestResults.removeValue(forKey: newEntry.id)
@@ -2340,7 +2361,7 @@ struct ProviderSetupView: View {
                     sortOrder: 0,
                     baseURL: providerType == .ollama ? effectiveOllamaBaseURL : (baseURL.isEmpty ? nil : baseURL),
                     customHeaders: Dictionary(uniqueKeysWithValues: customHeaders.filter { !$0.key.isEmpty }.map { ($0.key, $0.value) }),
-                    authMethod: providerType == .ollama ? .none : .apiKey,
+                    authMethod: providerType == .ollama ? (ollamaMode == .cloud ? .apiKey : .none) : .apiKey,
                     oauthClientID: nil,
                     oauthAuthURL: nil,
                     oauthTokenURL: nil,
