@@ -1147,8 +1147,11 @@ struct ProviderSetupView: View {
                 }
             }
             .onChange(of: ollamaMode) { oldValue, newValue in
-                if newValue == .local && baseURL.isEmpty {
-                    baseURL = ollamaLocalBaseURL
+                if newValue == .local {
+                    // Reset to default local URL when switching to local mode
+                    if oldValue == .cloud {
+                        baseURL = ollamaLocalBaseURL
+                    }
                 } else if newValue == .cloud {
                     baseURL = ollamaCloudBaseURL
                 }
