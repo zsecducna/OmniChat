@@ -2007,7 +2007,7 @@ struct ProviderSetupView: View {
         case .apiKey:
             // Load API key from Keychain
             switch providerType {
-            case .anthropic, .openai, .zhipu, .zhipuCoding, .zhipuAnthropic, .custom,
+            case .anthropic, .openai, .zhipuCoding, .custom,
                  .groq, .cerebras, .mistral, .deepSeek, .together,
                  .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
                 if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
@@ -3145,7 +3145,7 @@ struct ProviderSetupView: View {
                 )
 
                 // Use OAuthManager to initiate the flow
-                let token = try await OAuthManager.shared.authenticate(
+                let _ = try await OAuthManager.shared.authenticate(
                     providerID: providerID,
                     config: config
                 )

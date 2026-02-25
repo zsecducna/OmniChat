@@ -95,7 +95,7 @@ final class ChatViewModel {
     /// Calculated from input/output tokens using CostCalculator.
     var currentUsageCost: Double {
         guard let conversation = currentConversation,
-              let providerID = conversation.providerConfigID else {
+              conversation.providerConfigID != nil else {
             return 0
         }
 

@@ -237,7 +237,6 @@ struct MessageBubble: View {
         // Split the attributed string around code blocks
         // Since MarkdownParser leaves placeholders, we need to reconstruct
         var segments: [ContentSegment] = []
-        var currentText = AttributedString()
 
         // Get the string content to find code block placeholders
         let stringContent = String(attributedString.characters)
@@ -315,7 +314,7 @@ struct MessageBubble: View {
 
     /// Trims code block placeholder artifacts from attributed string.
     private func trimCodeBlockPlaceholders(from attributedString: AttributedString) -> AttributedString {
-        var result = attributedString
+        let result = attributedString
         let characters = String(result.characters)
 
         // Trim leading and trailing whitespace/newlines

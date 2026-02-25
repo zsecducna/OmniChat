@@ -164,8 +164,6 @@ final class KiloCodeAdapter: AIProvider, Sendable {
                 let contextWindow = model.context_length ?? contextWindowForModel(model.id)
                 // Check if model supports vision from architecture
                 let supportsVision = model.architecture?.input_modalities?.contains("image") ?? modelSupportsVision(model.id)
-                // Check if model is free (works without API key)
-                let isFree = model.pricing?.isFree ?? false
 
                 return ModelInfo(
                     id: model.id,

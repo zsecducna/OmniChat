@@ -38,6 +38,7 @@ private let logger = Logger(subsystem: "com.omnichatt.app", category: "Attachmen
 ///     AttachmentPicker(attachments: $attachments)
 /// }
 /// ```
+@MainActor
 struct AttachmentPicker: View {
     // MARK: - Properties
 
@@ -52,10 +53,6 @@ struct AttachmentPicker: View {
 
     /// Maximum file size in bytes (default: 20MB).
     var maxFileSize: Int = 20 * 1024 * 1024
-
-    // MARK: - Environment
-
-    @Environment(\.colorScheme) private var colorScheme
 
     // MARK: - State
 
@@ -77,14 +74,14 @@ struct AttachmentPicker: View {
                         .foregroundStyle(Theme.Colors.accent)
                     Text("Photo")
                         .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.secondaryText.resolve(in: colorScheme))
+                        .foregroundStyle(Theme.Colors.secondaryText)
                 }
                 .frame(width: 60, height: 60)
-                .background(Theme.Colors.tertiaryBackground.resolve(in: colorScheme))
+                .background(Theme.Colors.tertiaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue)
-                        .stroke(Theme.Colors.border.resolve(in: colorScheme), lineWidth: 1)
+                        .stroke(Theme.Colors.border, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -104,14 +101,14 @@ struct AttachmentPicker: View {
                         .foregroundStyle(Theme.Colors.accent)
                     Text("File")
                         .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.secondaryText.resolve(in: colorScheme))
+                        .foregroundStyle(Theme.Colors.secondaryText)
                 }
                 .frame(width: 60, height: 60)
-                .background(Theme.Colors.tertiaryBackground.resolve(in: colorScheme))
+                .background(Theme.Colors.tertiaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.medium.rawValue)
-                        .stroke(Theme.Colors.border.resolve(in: colorScheme), lineWidth: 1)
+                        .stroke(Theme.Colors.border, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -471,6 +468,7 @@ struct AttachmentPicker: View {
 ///
 /// Shows a thumbnail for images or an icon for documents,
 /// along with filename, size, and a remove button.
+@MainActor
 struct AttachmentPreview: View {
     // MARK: - Properties
 
@@ -598,6 +596,7 @@ struct AttachmentPreview: View {
 /// Horizontal scrollable list of attachment previews.
 ///
 /// Displays multiple attachments with the ability to remove each.
+@MainActor
 struct AttachmentPreviewList: View {
     // MARK: - Properties
 
@@ -633,6 +632,7 @@ struct AttachmentPreviewList: View {
 /// Compact inline picker with just icons (for use in message input bar).
 ///
 /// Shows only icon buttons without labels for a denser UI.
+@MainActor
 struct CompactAttachmentPicker: View {
     // MARK: - Properties
 
@@ -665,7 +665,7 @@ struct CompactAttachmentPicker: View {
             PhotosPicker(selection: $selectedItem, matching: .images) {
                 Image(systemName: "photo")
                     .font(.system(size: 16))
-                    .foregroundStyle(Theme.Colors.tertiaryText.resolve(in: colorScheme))
+                    .foregroundStyle(Theme.Colors.tertiaryText)
             }
             .buttonStyle(.plain)
             .onChange(of: selectedItem) { _, item in
@@ -680,7 +680,7 @@ struct CompactAttachmentPicker: View {
             } label: {
                 Image(systemName: "paperclip")
                     .font(.system(size: 16))
-                    .foregroundStyle(Theme.Colors.tertiaryText.resolve(in: colorScheme))
+                    .foregroundStyle(Theme.Colors.tertiaryText)
             }
             .buttonStyle(.plain)
             .fileImporter(
