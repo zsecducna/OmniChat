@@ -45,7 +45,7 @@ enum KeychainError: Error, Sendable, CustomStringConvertible {
 /// Represents a single API key entry with metadata.
 ///
 /// Used for providers that support multiple API keys (e.g., Ollama Cloud).
-struct APIKeyEntry: Identifiable, Codable, Sendable, Hashable {
+struct APIKeyEntry: Identifiable, Codable, Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible {
     /// Unique identifier for this key entry.
     var id: UUID
     /// User-defined label for this key (e.g., "Production", "Development").
@@ -67,6 +67,16 @@ struct APIKeyEntry: Identifiable, Codable, Sendable, Hashable {
         self.isActive = isActive
         self.isValid = isValid
         self.totalTokens = totalTokens
+    }
+
+    // MARK: - Custom String Convertible (redacts key in logs/debug)
+
+    var description: String {
+        "APIKeyEntry(id: \(id), label: \"\(label)\", key: \"[REDACTED]\", isActive: \(isActive), isValid: \(isValid ?? false), totalTokens: \(totalTokens))"
+    }
+
+    var debugDescription: String {
+        description
     }
 }
 

@@ -724,6 +724,12 @@ final class ChatViewModel {
     ///
     /// For Ollama Cloud with round-robin enabled, this selects the key with
     /// the lowest token usage and sets it as the active key.
+    ///
+    /// - Note: This method must be called on MainActor to prevent race conditions
+    ///   with concurrent requests. The selected key is stored in `currentRoundRobinKey`
+    ///   for the duration of the request.
+    private var currentRoundRobinKey: String?
+
     private func selectRoundRobinKeyIfNeeded(for conversation: Conversation) async {
         guard let providerConfig = currentProviderConfig,
               providerConfig.providerType == .ollama,
@@ -761,19 +767,21 @@ final class ChatViewModel {
 
         // Get the key with lowest token usage
         guard let selectedKey = config.keys.min(by: { $0.totalTokens < $1.totalTokens }) else {
+            currentRoundRobinKey = nil
             return
         }
 
         Self.logger.debug("Round-robin selected key '\(selectedKey.label)' with \(selectedKey.totalTokens) tokens")
 
-        // Update the active key in Keychain for adapter creation
+        // Store in per-request context
         currentAPIKeyLabel = selectedKey.label
         currentAPIKeyID = selectedKey.id
+        currentRoundRobinKey = selectedKey.key
 
-        // Save the selected key as the primary API key
+        // Update Keychain and clear cache atomically (MainActor ensures no race condition)
+        // The adapter will be created immediately after this in the same MainActor context
         do {
             try KeychainManager.shared.saveAPIKey(providerID: providerConfig.id, apiKey: selectedKey.key)
-            // Clear adapter cache to force refresh with new key
             providerManager.clearAdapterCache(for: providerConfig.id)
         } catch {
             Self.logger.error("Failed to set round-robin key: \(error.localizedDescription)")
