@@ -824,10 +824,13 @@ final class ChatViewModel {
             return
         }
 
-        let baseURL = providerConfig.baseURL ?? "https://open.bigmodel.cn"
+        // Always use the standard Z.AI API base URL for fetching models
+        // The providerConfig.baseURL might be set to Anthropic-compatible endpoint
+        // but the models endpoint is always at the standard Z.AI API location
+        let modelsBaseURL = "https://open.bigmodel.cn"
 
         // Fetch models from Z.AI API
-        guard let url = URL(string: "\(baseURL)/api/paas/v4/models") else {
+        guard let url = URL(string: "\(modelsBaseURL)/api/paas/v4/models") else {
             Self.logger.warning("Invalid URL for fetching Z.AI models")
             currentKeyAvailableModels = nil
             return
@@ -876,12 +879,16 @@ final class ChatViewModel {
     func validateModelAccess(selectedModel: String?) -> String? {
         // If we don't have key-specific models, use the selected model
         guard let availableModels = currentKeyAvailableModels else {
+            Self.logger.debug("No key-specific models available, using selected model: \(selectedModel ?? "nil")")
             return selectedModel
         }
 
-        // Check if selected model is available
+        Self.logger.debug("Validating model access. Selected: \(selectedModel ?? "nil"), Available: \(availableModels.map { $0.id })")
+
+        // Check if selected model is available (case-insensitive match)
         if let model = selectedModel,
-           availableModels.contains(where: { $0.id == model }) {
+           availableModels.contains(where: { $0.id.caseInsensitiveCompare(model) == .orderedSame }) {
+            Self.logger.debug("Model '\(model)' is available for current key")
             return model
         }
 
@@ -891,17 +898,18 @@ final class ChatViewModel {
 
         for priorityModel in priorityModels {
             if let available = availableModels.first(where: { $0.id.lowercased().contains(priorityModel) }) {
-                Self.logger.info("Model '\(selectedModel ?? "nil")' not available, falling back to '\(available.id)'")
+                Self.logger.info("Model '\(selectedModel ?? "nil")' not available for current key, falling back to '\(available.id)'")
                 return available.id
             }
         }
 
         // Return the first available model as last resort
         if let firstAvailable = availableModels.first {
-            Self.logger.info("Model '\(selectedModel ?? "nil")' not available, falling back to '\(firstAvailable.id)'")
+            Self.logger.info("Model '\(selectedModel ?? "nil")' not available, falling back to first available: '\(firstAvailable.id)'")
             return firstAvailable.id
         }
 
+        Self.logger.warning("No models available for current key, using selected model: \(selectedModel ?? "nil")")
         return selectedModel
     }
 }
