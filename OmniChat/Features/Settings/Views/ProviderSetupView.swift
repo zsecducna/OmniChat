@@ -2751,7 +2751,7 @@ struct ProviderSetupView: View {
                 )
 
                 switch providerType {
-                case .anthropic, .openai, .zhipu, .zhipuAnthropic, .zhipuCoding:
+                case .anthropic, .openai:
                     let adapter = try getAdapter(for: tempConfig, apiKey: apiKey)
                     logger.debug("Calling adapter.fetchModels() for \(self.providerType.rawValue)")
                     let models = try await adapter.fetchModels()
@@ -2762,6 +2762,88 @@ struct ProviderSetupView: View {
                         availableModels = models.sorted { $0.displayName < $1.displayName }
                         if selectedModelID == nil {
                             selectedModelID = models.first?.id
+                        }
+                    }
+
+                case .zhipu, .zhipuAnthropic, .zhipuCoding:
+                    // For Z.AI providers, fetch models from all API keys and combine
+                    let keysToFetch: [(UUID, String, String)] // (id, label, key)
+                    if !zhipuAPIKeys.isEmpty {
+                        keysToFetch = zhipuAPIKeys.map { ($0.id, $0.label, $0.key) }
+                        logger.debug("Fetching models from \(keysToFetch.count) Z.AI API key(s)")
+                    } else if !apiKey.isEmpty {
+                        keysToFetch = [(UUID(), "Primary", apiKey)]
+                        logger.debug("Fetching models from single API key")
+                    } else {
+                        logger.warning("No API keys available for Z.AI provider")
+                        await MainActor.run {
+                            isFetchingModels = false
+                            modelFetchError = "No API keys configured"
+                            loadDefaultModels()
+                        }
+                        return
+                    }
+
+                    // Create adapters for all keys on MainActor first
+                    let adaptersWithLabels: [(String, any AIProvider)] = await MainActor.run {
+                        keysToFetch.compactMap { (_, label, key) -> (String, any AIProvider)? in
+                            do {
+                                let adapter = try self.getAdapter(for: tempConfig, apiKey: key)
+                                return (label, adapter)
+                            } catch {
+                                logger.warning("Failed to create adapter for key '\(label)': \(error.localizedDescription)")
+                                return nil
+                            }
+                        }
+                    }
+
+                    // Fetch models from each adapter concurrently
+                    var allModels: [ModelInfo] = []
+                    var fetchErrors: [String] = []
+
+                    await withTaskGroup(of: (String, [ModelInfo]?, String?).self) { group in
+                        for (label, adapter) in adaptersWithLabels {
+                            group.addTask {
+                                do {
+                                    let models = try await adapter.fetchModels()
+                                    return (label, models, nil)
+                                } catch {
+                                    return (label, nil, error.localizedDescription)
+                                }
+                            }
+                        }
+
+                        for await (label, models, error) in group {
+                            if let models = models {
+                                logger.debug("Fetched \(models.count) models from key '\(label)'")
+                                allModels.append(contentsOf: models)
+                            } else if let error = error {
+                                logger.warning("Failed to fetch models from key '\(label)': \(error)")
+                                fetchErrors.append("\(label): \(error)")
+                            }
+                        }
+                    }
+
+                    // Deduplicate models by ID
+                    let uniqueModels = Dictionary(grouping: allModels, by: { $0.id })
+                        .compactMapValues { $0.first }
+                        .values
+                        .sorted { $0.displayName < $1.displayName }
+
+                    await MainActor.run {
+                        isFetchingModels = false
+                        if uniqueModels.isEmpty {
+                            modelFetchError = fetchErrors.isEmpty
+                                ? "No models found"
+                                : "Failed to fetch models: " + fetchErrors.joined(separator: "; ")
+                            loadDefaultModels()
+                        } else {
+                            modelFetchError = fetchErrors.isEmpty ? nil : "Some keys failed: " + fetchErrors.joined(separator: "; ")
+                            availableModels = Array(uniqueModels)
+                            if selectedModelID == nil {
+                                selectedModelID = uniqueModels.first?.id
+                            }
+                            logger.debug("Combined \(uniqueModels.count) unique models from Z.AI keys")
                         }
                     }
 
