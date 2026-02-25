@@ -347,7 +347,9 @@ final class ChatViewModel {
         let chatMessages = buildChatMessages()
 
         // Capture values needed for streaming
-        let modelID = effectiveModelID
+        // Validate model access for Z.AI providers with multiple API keys
+        let baseModelID = effectiveModelID
+        let modelID = validateModelAccess(selectedModel: baseModelID) ?? baseModelID
         // Resolve system prompt from persona or conversation's direct systemPrompt
         let systemPrompt = resolveSystemPrompt()
 
@@ -722,28 +724,44 @@ final class ChatViewModel {
 
     /// Selects the next API key for round-robin if enabled.
     ///
-    /// For Ollama Cloud with round-robin enabled, this selects the key with
-    /// the lowest token usage and sets it as the active key.
+    /// For providers with round-robin enabled (Ollama Cloud, Z.AI), this selects
+    /// the key with the lowest token usage and sets it as the active key.
     ///
     /// - Note: This method must be called on MainActor to prevent race conditions
     ///   with concurrent requests. The selected key is stored in `currentRoundRobinKey`
     ///   for the duration of the request.
     private var currentRoundRobinKey: String?
 
+    /// The currently available models for the selected API key (for Z.AI dynamic model access).
+    var currentKeyAvailableModels: [ModelInfo]?
+
     private func selectRoundRobinKeyIfNeeded(for conversation: Conversation) async {
         guard let providerConfig = currentProviderConfig,
-              providerConfig.providerType == .ollama,
               conversation.providerConfigID != nil else {
             currentAPIKeyLabel = nil
             currentAPIKeyID = nil
+            currentKeyAvailableModels = nil
             return
         }
 
-        // Check if this is Ollama Cloud (base URL matches ollama.com)
-        let baseURL = providerConfig.baseURL ?? ""
-        guard baseURL == "https://ollama.com" else {
+        // Check if this provider type supports multiple API keys
+        let supportsMultipleKeys: Bool
+        switch providerConfig.providerType {
+        case .ollama:
+            // Ollama Cloud supports multiple keys
+            let baseURL = providerConfig.baseURL ?? ""
+            supportsMultipleKeys = (baseURL == "https://ollama.com")
+        case .zhipu, .zhipuAnthropic:
+            // Z.AI providers support multiple keys
+            supportsMultipleKeys = true
+        default:
+            supportsMultipleKeys = false
+        }
+
+        guard supportsMultipleKeys else {
             currentAPIKeyLabel = nil
             currentAPIKeyID = nil
+            currentKeyAvailableModels = nil
             return
         }
 
@@ -753,6 +771,7 @@ final class ChatViewModel {
         guard let config = config, !config.keys.isEmpty else {
             currentAPIKeyLabel = nil
             currentAPIKeyID = nil
+            currentKeyAvailableModels = nil
             return
         }
 
@@ -761,6 +780,8 @@ final class ChatViewModel {
             if let activeKey = config.keys.first(where: { $0.isActive }) {
                 currentAPIKeyLabel = activeKey.label
                 currentAPIKeyID = activeKey.id
+                // Fetch available models for this key (for Z.AI)
+                await fetchAvailableModelsForKey(activeKey.key, providerConfig: providerConfig)
             }
             return
         }
@@ -768,6 +789,7 @@ final class ChatViewModel {
         // Get the key with lowest token usage
         guard let selectedKey = config.keys.min(by: { $0.totalTokens < $1.totalTokens }) else {
             currentRoundRobinKey = nil
+            currentKeyAvailableModels = nil
             return
         }
 
@@ -783,9 +805,104 @@ final class ChatViewModel {
         do {
             try KeychainManager.shared.saveAPIKey(providerID: providerConfig.id, apiKey: selectedKey.key)
             providerManager.clearAdapterCache(for: providerConfig.id)
+            // Fetch available models for this key (for Z.AI dynamic model access)
+            await fetchAvailableModelsForKey(selectedKey.key, providerConfig: providerConfig)
         } catch {
             Self.logger.error("Failed to set round-robin key: \(error.localizedDescription)")
         }
+    }
+
+    /// Fetches available models for the current API key (for Z.AI dynamic model access).
+    ///
+    /// Z.AI API keys have different model access based on subscription levels.
+    /// This method fetches the models available to the current key and updates
+    /// `currentKeyAvailableModels`.
+    private func fetchAvailableModelsForKey(_ apiKey: String, providerConfig: ProviderConfig) async {
+        // Only Z.AI providers need dynamic model fetching
+        guard providerConfig.providerType == .zhipu || providerConfig.providerType == .zhipuAnthropic else {
+            currentKeyAvailableModels = nil
+            return
+        }
+
+        let baseURL = providerConfig.baseURL ?? "https://open.bigmodel.cn"
+
+        // Fetch models from Z.AI API
+        guard let url = URL(string: "\(baseURL)/api/paas/v4/models") else {
+            Self.logger.warning("Invalid URL for fetching Z.AI models")
+            currentKeyAvailableModels = nil
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                Self.logger.warning("Failed to fetch Z.AI models: invalid response")
+                currentKeyAvailableModels = nil
+                return
+            }
+
+            // Parse Z.AI models response
+            struct ZhipuModel: Codable {
+                let id: String
+                let ownedBy: String?
+            }
+
+            struct ZhipuModelsResponse: Codable {
+                let data: [ZhipuModel]
+            }
+
+            let zhipuResponse = try JSONDecoder().decode(ZhipuModelsResponse.self, from: data)
+            let models = zhipuResponse.data.map { ModelInfo(id: $0.id, displayName: $0.id) }
+
+            await MainActor.run {
+                currentKeyAvailableModels = models
+                Self.logger.debug("Fetched \(models.count) models for Z.AI key")
+            }
+        } catch {
+            Self.logger.warning("Failed to fetch Z.AI models: \(error.localizedDescription)")
+            currentKeyAvailableModels = nil
+        }
+    }
+
+    /// Validates that the selected model is available for the current API key.
+    /// Returns the model to use (may be different from selected if fallback is needed).
+    func validateModelAccess(selectedModel: String?) -> String? {
+        // If we don't have key-specific models, use the selected model
+        guard let availableModels = currentKeyAvailableModels else {
+            return selectedModel
+        }
+
+        // Check if selected model is available
+        if let model = selectedModel,
+           availableModels.contains(where: { $0.id == model }) {
+            return model
+        }
+
+        // Model not available - find the best fallback
+        // Priority: GLM-5 > GLM-4.7 > GLM-4 > latest available
+        let priorityModels = ["glm-5", "glm-4.7", "glm-4"]
+
+        for priorityModel in priorityModels {
+            if let available = availableModels.first(where: { $0.id.lowercased().contains(priorityModel) }) {
+                Self.logger.info("Model '\(selectedModel ?? "nil")' not available, falling back to '\(available.id)'")
+                return available.id
+            }
+        }
+
+        // Return the first available model as last resort
+        if let firstAvailable = availableModels.first {
+            Self.logger.info("Model '\(selectedModel ?? "nil")' not available, falling back to '\(firstAvailable.id)'")
+            return firstAvailable.id
+        }
+
+        return selectedModel
     }
 }
 

@@ -158,6 +158,25 @@ struct ProviderSetupView: View {
     @State private var useRoundRobinKeySelection = false
     @State private var apiKeyError: String?
 
+    // MARK: - Z.AI Configuration State
+
+    /// Multiple API keys for Z.AI providers
+    @State private var zhipuAPIKeys: [APIKeyEntry] = []
+
+    /// New Z.AI API key being entered
+    @State private var newZhipuAPIKeyLabel = ""
+    @State private var newZhipuAPIKeyValue = ""
+
+    /// Results of testing Z.AI API keys
+    @State private var zhipuAPIKeyTestResults: [UUID: ConnectionTestResult] = [:]
+
+    /// Whether we're currently testing all Z.AI API keys
+    @State private var isTestingAllZhipuKeys = false
+
+    /// Whether to use round-robin key selection for Z.AI
+    @State private var useZhipuRoundRobinKeySelection = false
+    @State private var zhipuAPIKeyError: String?
+
     // MARK: - Validation State
 
     @State private var isValidating = false
@@ -361,7 +380,7 @@ struct ProviderSetupView: View {
             }
 
             switch providerType {
-            case .anthropic, .openai, .zhipu, .zhipuAnthropic:
+            case .anthropic, .openai:
                 switch selectedAuthMethod {
                 case .apiKey:
                     apiKeySection
@@ -372,6 +391,9 @@ struct ProviderSetupView: View {
                     apiKeySection
                     validationSection
                 }
+
+            case .zhipu, .zhipuAnthropic:
+                zhipuConfigurationSection
 
             case .ollama:
                 ollamaConfigurationSection
@@ -1357,6 +1379,142 @@ struct ProviderSetupView: View {
         }
     }
 
+    // MARK: - Z.AI Configuration Section
+
+    /// Z.AI base URL
+    private let zhipuBaseURL = "https://open.bigmodel.cn"
+
+    @ViewBuilder
+    private var zhipuConfigurationSection: some View {
+        // API Keys List
+        Section {
+            // Existing API keys
+            ForEach(Array(zhipuAPIKeys.enumerated()), id: \.element.id) { index, keyEntry in
+                zhipuAPIKeyRow(keyEntry)
+            }
+
+            // Add new API key form
+            if zhipuAPIKeys.count < 10 { // Limit to 10 keys
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Label (e.g., Production)", text: $newZhipuAPIKeyLabel)
+                        .font(Theme.Typography.body)
+                        #if os(iOS)
+                        .autocapitalization(.words)
+                        #endif
+
+                    SecureField("API Key", text: $newZhipuAPIKeyValue)
+                        .font(Theme.Typography.body)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        #endif
+
+                    Button {
+                        addZhipuAPIKey()
+                    } label: {
+                        Label("Add Key", systemImage: "plus.circle")
+                            .font(Theme.Typography.body)
+                    }
+                    .disabled(newZhipuAPIKeyValue.isEmpty || newZhipuAPIKeyLabel.isEmpty)
+                }
+            }
+        } header: {
+            Text("API Keys")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                if let error = zhipuAPIKeyError {
+                    Text(error)
+                        .foregroundStyle(Theme.Colors.destructive)
+                }
+                if useZhipuRoundRobinKeySelection {
+                    Text("Round-robin enabled: Keys will be selected automatically based on token usage.")
+                } else {
+                    Text("Add multiple API keys. Select which key to use, or enable round-robin below.")
+                }
+                if zhipuAPIKeys.count >= 10 {
+                    Text("Maximum 10 API keys supported.")
+                        .foregroundStyle(Theme.Colors.secondaryText)
+                }
+            }
+        }
+
+        // Round-Robin Key Selection
+        Section {
+            Toggle(isOn: $useZhipuRoundRobinKeySelection) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Dynamic Key Selection")
+                        .font(Theme.Typography.body)
+                    Text("Automatically balance token usage across all keys")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.secondaryText)
+                }
+            }
+            .disabled(zhipuAPIKeys.count < 2)
+        } footer: {
+            if zhipuAPIKeys.count < 2 {
+                Text("Add at least 2 API keys to enable round-robin selection")
+            } else if useZhipuRoundRobinKeySelection {
+                Text("Keys will be rotated automatically to balance token usage. The key with the lowest usage will be selected for each request.")
+            }
+        }
+
+        // Connection Test
+        Section {
+            // Test all keys button
+            Button {
+                testAllZhipuAPIKeys()
+            } label: {
+                HStack {
+                    Label("Test All Keys", systemImage: "antenna.radiowaves.left.and.right")
+                        .font(Theme.Typography.body)
+                    Spacer()
+                    if isTestingAllZhipuKeys {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            .disabled(isTestingAllZhipuKeys || zhipuAPIKeys.isEmpty)
+
+            // Summary of test results
+            if !zhipuAPIKeyTestResults.isEmpty {
+                let validCount = zhipuAPIKeyTestResults.values.filter { if case .success = $0 { return true }; return false }.count
+                let invalidCount = zhipuAPIKeyTestResults.count - validCount
+                HStack {
+                    if validCount > 0 {
+                        Label("\(validCount) valid", systemImage: "checkmark.circle.fill")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.success)
+                    }
+                    if invalidCount > 0 {
+                        Label("\(invalidCount) invalid", systemImage: "xmark.circle.fill")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.destructive)
+                    }
+                }
+            }
+        } header: {
+            Text("Validation")
+        } footer: {
+            Text("Test all API keys to verify they are valid")
+        }
+
+        // About Section
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Z.AI (Zhipu AI) provides access to GLM and ChatGLM models through their API.")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.secondaryText)
+
+                Text("Get your API key from the Z.AI console at open.bigmodel.cn")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.secondaryText)
+            }
+        } header: {
+            Text("About Z.AI")
+        }
+    }
+
     // MARK: - Custom Provider Configuration Section
 
     @ViewBuilder
@@ -1523,7 +1681,7 @@ struct ProviderSetupView: View {
 
     private var canProceedFromAuthStep: Bool {
         switch providerType {
-        case .anthropic, .openai, .zhipu, .zhipuAnthropic:
+        case .anthropic, .openai:
             switch selectedAuthMethod {
             case .apiKey:
                 return isValidated
@@ -1532,6 +1690,17 @@ struct ProviderSetupView: View {
             default:
                 return isValidated
             }
+        case .zhipu, .zhipuAnthropic:
+            // Z.AI providers need at least one valid API key
+            guard !zhipuAPIKeys.isEmpty else { return false }
+            // Check if the active key has been tested and is valid
+            if let activeKey = zhipuAPIKeys.first(where: { $0.isActive }) {
+                if let result = zhipuAPIKeyTestResults[activeKey.id], case .success = result {
+                    return true
+                }
+            }
+            // Alternatively, if any key is valid, allow proceeding
+            return zhipuAPIKeyTestResults.values.contains { if case .success = $0 { return true }; return false }
         case .ollama:
             // For local Ollama, no auth is needed
             // For cloud Ollama, at least one valid API key is required
@@ -1860,6 +2029,17 @@ struct ProviderSetupView: View {
                 }
                 isValidated = true
                 connectionTestResult = nil
+            case .zhipu, .zhipuAnthropic:
+                // Load multiple API keys for Z.AI providers
+                if let config = try? KeychainManager.shared.readAPIKeysConfig(providerID: provider.id), !config.keys.isEmpty {
+                    zhipuAPIKeys = config.keys
+                    useZhipuRoundRobinKeySelection = config.useRoundRobin
+                } else if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
+                    // Fallback: migrate single key to new format
+                    zhipuAPIKeys = [APIKeyEntry(label: "Primary", key: key, isActive: true)]
+                    useZhipuRoundRobinKeySelection = false
+                }
+                isValidated = true
             }
 
         case .oauth:
@@ -2255,6 +2435,201 @@ struct ProviderSetupView: View {
             }
             return .failure(error.localizedDescription)
         }
+    }
+
+    // MARK: - Z.AI API Key Helpers
+
+    /// Adds a new Z.AI API key to the list.
+    private func addZhipuAPIKey() {
+        guard !newZhipuAPIKeyValue.isEmpty && !newZhipuAPIKeyLabel.isEmpty else { return }
+
+        let trimmedKey = newZhipuAPIKeyValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Check for duplicate key
+        if zhipuAPIKeys.contains(where: { $0.key == trimmedKey }) {
+            zhipuAPIKeyError = "This API key is already added"
+            return
+        }
+
+        // If this is the first key, make it active (unless round-robin is enabled)
+        let isActive = zhipuAPIKeys.isEmpty && !useZhipuRoundRobinKeySelection
+
+        let newEntry = APIKeyEntry(
+            label: newZhipuAPIKeyLabel.trimmingCharacters(in: .whitespacesAndNewlines),
+            key: trimmedKey,
+            isActive: isActive
+        )
+
+        zhipuAPIKeys.append(newEntry)
+
+        // Clear input fields
+        newZhipuAPIKeyLabel = ""
+        newZhipuAPIKeyValue = ""
+        zhipuAPIKeyError = nil
+
+        // Clear previous test results
+        zhipuAPIKeyTestResults.removeValue(forKey: newEntry.id)
+    }
+
+    /// Deletes a Z.AI API key from the list.
+    private func deleteZhipuAPIKey(_ keyID: UUID) {
+        let wasActive = zhipuAPIKeys.first { $0.id == keyID }?.isActive ?? false
+        zhipuAPIKeys.removeAll { $0.id == keyID }
+        zhipuAPIKeyTestResults.removeValue(forKey: keyID)
+
+        // If we deleted the active key, make the first remaining key active
+        if wasActive && !zhipuAPIKeys.isEmpty {
+            zhipuAPIKeys[0].isActive = true
+        }
+    }
+
+    /// Sets a Z.AI API key as the active one.
+    private func setActiveZhipuAPIKey(_ keyID: UUID) {
+        for i in zhipuAPIKeys.indices {
+            zhipuAPIKeys[i].isActive = (zhipuAPIKeys[i].id == keyID)
+        }
+    }
+
+    /// Tests all Z.AI API keys and reports results.
+    private func testAllZhipuAPIKeys() {
+        guard !zhipuAPIKeys.isEmpty else { return }
+
+        isTestingAllZhipuKeys = true
+        zhipuAPIKeyTestResults = [:]
+
+        Task {
+            // Test each key concurrently
+            await withTaskGroup(of: (UUID, ConnectionTestResult).self) { group in
+                for keyEntry in zhipuAPIKeys {
+                    group.addTask {
+                        let result = await self.testSingleZhipuAPIKey(keyEntry.key)
+                        return (keyEntry.id, result)
+                    }
+                }
+
+                // Collect results
+                for await (keyID, result) in group {
+                    await MainActor.run {
+                        zhipuAPIKeyTestResults[keyID] = result
+                    }
+                }
+            }
+
+            await MainActor.run {
+                isTestingAllZhipuKeys = false
+            }
+        }
+    }
+
+    /// Tests a single Z.AI API key.
+    private func testSingleZhipuAPIKey(_ key: String) async -> ConnectionTestResult {
+        // Z.AI uses JWT token authentication
+        // We'll test by making a simple API call to list models
+        guard let url = URL(string: "\(zhipuBaseURL)/api/paas/v4/models") else {
+            return .failure("Invalid URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                switch httpResponse.statusCode {
+                case 200:
+                    return .success
+                case 401, 403:
+                    return .failure("Invalid key")
+                default:
+                    return .failure("Status \(httpResponse.statusCode)")
+                }
+            }
+            return .failure("No response")
+        } catch {
+            if let urlError = error as? URLError {
+                return .failure(urlError.localizedDescription)
+            }
+            return .failure(error.localizedDescription)
+        }
+    }
+
+    /// Row view for a Z.AI API key entry.
+    private func zhipuAPIKeyRow(_ keyEntry: APIKeyEntry) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(keyEntry.label)
+                        .font(Theme.Typography.body)
+                    // Show "Active" badge only when NOT using round-robin
+                    if !useZhipuRoundRobinKeySelection && keyEntry.isActive {
+                        Text("Active")
+                            .font(Theme.Typography.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.Colors.accent)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                    }
+                }
+                Text(String(repeating: "•", count: min(keyEntry.key.count, 20)))
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.tertiaryText)
+
+                // Test result indicator
+                if let result = zhipuAPIKeyTestResults[keyEntry.id] {
+                    switch result {
+                    case .success:
+                        HStack(spacing: 2) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 10))
+                            Text("Valid")
+                                .font(Theme.Typography.caption)
+                        }
+                        .foregroundStyle(Theme.Colors.success)
+                    case .failure(let message):
+                        HStack(spacing: 2) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                            Text(message)
+                                .font(Theme.Typography.caption)
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(Theme.Colors.destructive)
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Actions
+            HStack(spacing: 12) {
+                // Set as active button (only when not using round-robin)
+                if !useZhipuRoundRobinKeySelection && !keyEntry.isActive {
+                    Button {
+                        setActiveZhipuAPIKey(keyEntry.id)
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Delete button
+                Button {
+                    deleteZhipuAPIKey(keyEntry.id)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.Colors.destructive)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Custom Provider Connection Test
@@ -2697,6 +3072,20 @@ struct ProviderSetupView: View {
                     let config2 = APIKeysConfig(keys: ollamaAPIKeys, useRoundRobin: useRoundRobinKeySelection)
                     try KeychainManager.shared.saveAPIKeysConfig(providerID: config.id, config: config2)
                     Self.logger.info("Successfully saved \(ollamaAPIKeys.count) API key(s) for Ollama Cloud '\(config.name)' (roundRobin: \(useRoundRobinKeySelection))")
+                } catch {
+                    Self.logger.error("Failed to save API keys for '\(config.name)': \(error.localizedDescription)")
+                }
+            } else if providerType == .zhipu || providerType == .zhipuAnthropic {
+                // For Z.AI providers, save multiple API keys
+                do {
+                    // Save the active key as the primary API key for backward compatibility
+                    if let activeKey = zhipuAPIKeys.first(where: { $0.isActive }) {
+                        try KeychainManager.shared.saveAPIKey(activeKey.key, providerID: config.id)
+                    }
+                    // Save all keys with round-robin config
+                    let keysConfig = APIKeysConfig(keys: zhipuAPIKeys, useRoundRobin: useZhipuRoundRobinKeySelection)
+                    try KeychainManager.shared.saveAPIKeysConfig(providerID: config.id, config: keysConfig)
+                    Self.logger.info("Successfully saved \(zhipuAPIKeys.count) API key(s) for Z.AI '\(config.name)' (roundRobin: \(useZhipuRoundRobinKeySelection))")
                 } catch {
                     Self.logger.error("Failed to save API keys for '\(config.name)': \(error.localizedDescription)")
                 }
