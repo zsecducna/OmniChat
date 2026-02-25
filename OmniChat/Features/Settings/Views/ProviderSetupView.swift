@@ -1135,8 +1135,14 @@ struct ProviderSetupView: View {
             } footer: {
                 Text("Default: \(ollamaLocalBaseURL) - Local Ollama runs without authentication")
             }
+            }
             .onAppear {
                 if baseURL.isEmpty {
+                    baseURL = ollamaLocalBaseURL
+                }
+            }
+            .onChange(of: ollamaMode) { oldValue, newValue in
+                if newValue == .local && baseURL.isEmpty {
                     baseURL = ollamaLocalBaseURL
                 }
             }
