@@ -3160,8 +3160,8 @@ struct ProviderSetupView: View {
             } else if providerType == .zhipu || providerType == .zhipuAnthropic || providerType == .zhipuCoding {
                 // For Z.AI providers, save multiple API keys
                 do {
-                    // Save the active key as the primary API key for backward compatibility
-                    if let activeKey = zhipuAPIKeys.first(where: { $0.isActive }) {
+                    // Save the active key (or first key if round-robin) as primary for backward compatibility
+                    if let activeKey = zhipuAPIKeys.first(where: { $0.isActive }) ?? zhipuAPIKeys.first {
                         try KeychainManager.shared.saveAPIKey(activeKey.key, providerID: config.id)
                     }
                     // Save all keys with round-robin config

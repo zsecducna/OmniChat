@@ -864,10 +864,8 @@ final class ChatViewModel {
             let zhipuResponse = try JSONDecoder().decode(ZhipuModelsResponse.self, from: data)
             let models = zhipuResponse.data.map { ModelInfo(id: $0.id, displayName: $0.id) }
 
-            await MainActor.run {
-                currentKeyAvailableModels = models
-                Self.logger.debug("Fetched \(models.count) models for Z.AI key")
-            }
+            currentKeyAvailableModels = models
+            Self.logger.debug("Fetched \(models.count) models for Z.AI key")
         } catch {
             Self.logger.warning("Failed to fetch Z.AI models: \(error.localizedDescription)")
             currentKeyAvailableModels = nil
@@ -897,7 +895,11 @@ final class ChatViewModel {
         let priorityModels = ["glm-5", "glm-4.7", "glm-4"]
 
         for priorityModel in priorityModels {
-            if let available = availableModels.first(where: { $0.id.lowercased().contains(priorityModel) }) {
+            // Use precise prefix matching to avoid false positives (e.g., "glm-50" matching "glm-5")
+            if let available = availableModels.first(where: { model in
+                let lowercased = model.id.lowercased()
+                return lowercased == priorityModel || lowercased.hasPrefix(priorityModel + "-")
+            }) {
                 Self.logger.info("Model '\(selectedModel ?? "nil")' not available for current key, falling back to '\(available.id)'")
                 return available.id
             }
