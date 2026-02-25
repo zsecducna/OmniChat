@@ -392,14 +392,14 @@ struct ProviderSetupView: View {
                     validationSection
                 }
 
-            case .zhipu, .zhipuAnthropic:
+            case .zhipu, .zhipuAnthropic, .zhipuCoding:
                 zhipuConfigurationSection
 
             case .ollama:
                 ollamaConfigurationSection
 
             // OpenAI-compatible providers - use same auth flow as OpenAI
-            case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
+            case .groq, .cerebras, .mistral, .deepSeek, .together,
                  .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                 openAICompatibleAuthSection
 
@@ -1690,7 +1690,7 @@ struct ProviderSetupView: View {
             default:
                 return isValidated
             }
-        case .zhipu, .zhipuAnthropic:
+        case .zhipu, .zhipuAnthropic, .zhipuCoding:
             // Z.AI providers need at least one valid API key
             guard !zhipuAPIKeys.isEmpty else { return false }
             // Check if the active key has been tested and is valid
@@ -1717,7 +1717,7 @@ struct ProviderSetupView: View {
                 return apiKeyTestResults.values.contains { if case .success = $0 { return true }; return false }
             }
             return true
-        case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
+        case .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
             // OpenAI-compatible providers need API key validation
             return isValidated
@@ -2007,7 +2007,7 @@ struct ProviderSetupView: View {
         case .apiKey:
             // Load API key from Keychain
             switch providerType {
-            case .anthropic, .openai, .zhipuCoding, .custom,
+            case .anthropic, .openai, .custom,
                  .groq, .cerebras, .mistral, .deepSeek, .together,
                  .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
                 if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
@@ -2029,7 +2029,7 @@ struct ProviderSetupView: View {
                 }
                 isValidated = true
                 connectionTestResult = nil
-            case .zhipu, .zhipuAnthropic:
+            case .zhipu, .zhipuAnthropic, .zhipuCoding:
                 // Load multiple API keys for Z.AI providers
                 if let config = try? KeychainManager.shared.readAPIKeysConfig(providerID: provider.id), !config.keys.isEmpty {
                     zhipuAPIKeys = config.keys
@@ -2751,7 +2751,7 @@ struct ProviderSetupView: View {
                 )
 
                 switch providerType {
-                case .anthropic, .openai, .zhipu, .zhipuAnthropic:
+                case .anthropic, .openai, .zhipu, .zhipuAnthropic, .zhipuCoding:
                     let adapter = try getAdapter(for: tempConfig, apiKey: apiKey)
                     logger.debug("Calling adapter.fetchModels() for \(self.providerType.rawValue)")
                     let models = try await adapter.fetchModels()
@@ -2765,7 +2765,7 @@ struct ProviderSetupView: View {
                         }
                     }
 
-                case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
+                case .groq, .cerebras, .mistral, .deepSeek, .together,
                      .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google:
                     // OpenAI-compatible providers - try to fetch models
                     logger.debug("Fetching models from \(self.providerType.rawValue) (OpenAI-compatible)")
@@ -3075,7 +3075,7 @@ struct ProviderSetupView: View {
                 } catch {
                     Self.logger.error("Failed to save API keys for '\(config.name)': \(error.localizedDescription)")
                 }
-            } else if providerType == .zhipu || providerType == .zhipuAnthropic {
+            } else if providerType == .zhipu || providerType == .zhipuAnthropic || providerType == .zhipuCoding {
                 // For Z.AI providers, save multiple API keys
                 do {
                     // Save the active key as the primary API key for backward compatibility

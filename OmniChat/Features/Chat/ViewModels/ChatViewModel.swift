@@ -751,7 +751,7 @@ final class ChatViewModel {
             // Ollama Cloud supports multiple keys
             let baseURL = providerConfig.baseURL ?? ""
             supportsMultipleKeys = (baseURL == "https://ollama.com")
-        case .zhipu, .zhipuAnthropic:
+        case .zhipu, .zhipuAnthropic, .zhipuCoding:
             // Z.AI providers support multiple keys
             supportsMultipleKeys = true
         default:
@@ -819,7 +819,7 @@ final class ChatViewModel {
     /// `currentKeyAvailableModels`.
     private func fetchAvailableModelsForKey(_ apiKey: String, providerConfig: ProviderConfig) async {
         // Only Z.AI providers need dynamic model fetching
-        guard providerConfig.providerType == .zhipu || providerConfig.providerType == .zhipuAnthropic else {
+        guard providerConfig.providerType == .zhipu || providerConfig.providerType == .zhipuAnthropic || providerConfig.providerType == .zhipuCoding else {
             currentKeyAvailableModels = nil
             return
         }
