@@ -61,6 +61,30 @@ enum SetupStep: Int, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Ollama Mode
+
+/// Ollama connection mode for local vs cloud configuration.
+enum OllamaMode: String, CaseIterable, Identifiable {
+    case local
+    case cloud
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .local: return "Local"
+        case .cloud: return "Cloud"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .local: return "Run Ollama on your machine"
+        case .cloud: return "Use Ollama's hosted service"
+        }
+    }
+}
+
 // MARK: - ProviderSetupView
 
 /// Multi-step form for configuring a new or existing AI provider.
@@ -111,6 +135,28 @@ struct ProviderSetupView: View {
     @State private var apiFormat: APIFormat = .openAI
     @State private var streamingFormat: StreamingFormat = .sse
     @State private var customHeaders: [(key: String, value: String)] = []
+
+    // MARK: - Ollama Configuration State
+
+    /// Ollama connection mode: local server or cloud
+    @State private var ollamaMode: OllamaMode = .local
+
+    /// Multiple API keys for Ollama Cloud
+    @State private var ollamaAPIKeys: [APIKeyEntry] = []
+
+    /// New API key being entered
+    @State private var newAPIKeyLabel = ""
+    @State private var newAPIKeyValue = ""
+
+    /// Results of testing multiple API keys
+    @State private var apiKeyTestResults: [UUID: ConnectionTestResult] = [:]
+
+    /// Whether we're currently testing all API keys
+    @State private var isTestingAllKeys = false
+
+    /// Whether to use round-robin key selection based on token usage
+    @State private var useRoundRobinKeySelection = false
+    @State private var apiKeyError: String?
 
     // MARK: - Validation State
 
@@ -303,9 +349,6 @@ struct ProviderSetupView: View {
             }
         }
         .formStyle(.grouped)
-        .safeAreaInset(edge: .bottom) {
-            continueButton(canProceed: !name.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
     }
 
     // MARK: - Step 2: Authentication
@@ -1058,97 +1101,241 @@ struct ProviderSetupView: View {
             }
         }
     }
-
-    // MARK: - Ollama Configuration Section
-
-    /// Returns whether the current Ollama URL is for a cloud instance.
-    /// Cloud instances require API key authentication.
-    private var isOllamaCloudInstance: Bool {
-        let url = baseURL.lowercased()
-        // Check if URL is not localhost or 127.0.0.1
-        let isLocalhost = url.contains("localhost") || url.contains("127.0.0.1") || url.isEmpty
-        return !isLocalhost
-    }
+    /// Ollama Cloud base URL (endpoints like /api/chat are appended by the adapter)
+    private let ollamaCloudBaseURL = "https://ollama.com"
 
     @ViewBuilder
     private var ollamaConfigurationSection: some View {
         Section {
-            TextField("Base URL", text: $baseURL)
-                .textContentType(.URL)
-                #if os(iOS)
-                .keyboardType(.URL)
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-                #endif
-        } header: {
-            Text("Server URL")
-        } footer: {
-            if isOllamaCloudInstance {
-                Text("Cloud-hosted Ollama requires an API key for authentication")
-            } else {
-                Text("Default: http://localhost:11434 - Local Ollama runs without authentication")
+            Picker("Connection Mode", selection: $ollamaMode) {
+                ForEach(OllamaMode.allCases) { mode in
+                    Text(mode.title)
+                        .tag(mode)
+                }
             }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Connection Type")
+        } footer: {
+            Text(ollamaMode.description)
         }
 
-        // API Key for cloud-hosted Ollama
-        if isOllamaCloudInstance {
+        // Local Configuration
+        if ollamaMode == .local {
             Section {
-                SecureField("API Key", text: $apiKey)
-                    .textContentType(.password)
+                TextField("Base URL", text: $baseURL)
+                    .textContentType(.URL)
                     #if os(iOS)
+                    .keyboardType(.URL)
                     .autocapitalization(.none)
                     .autocorrectionDisabled()
                     #endif
             } header: {
-                Text("Authentication")
+                Text("Server URL")
             } footer: {
-                Text("Enter your Ollama Cloud API key for authentication")
+                Text("Default: \(ollamaLocalBaseURL) - Local Ollama runs without authentication")
+            }
+            .onAppear {
+                if baseURL.isEmpty {
+                    baseURL = ollamaLocalBaseURL
+                }
+            }
+            .onChange(of: ollamaMode) { oldValue, newValue in
+                if newValue == .local {
+                    baseURL = ollamaLocalBaseURL
+                } else if newValue == .cloud {
+                    baseURL = ollamaCloudBaseURL
+                }
             }
         }
 
-        Section {
-            Button {
-                testOllamaConnection()
-            } label: {
+        // Cloud Configuration
+        if ollamaMode == .cloud {
+            Section {
                 HStack {
-                    Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
+                    Text(ollamaCloudBaseURL)
                         .font(Theme.Typography.body)
+                        .foregroundStyle(Theme.Colors.secondaryText)
                     Spacer()
-                    if isTestingConnection {
-                        ProgressView()
-                            .scaleEffect(0.8)
+                }
+            } header: {
+                Text("Server URL")
+            } footer: {
+                Text("Ollama Cloud endpoint")
+            }
+
+            // API Keys List
+            Section {
+                // Existing API keys
+                ForEach(Array(ollamaAPIKeys.enumerated()), id: \.element.id) { index, keyEntry in
+                    ollamaAPIKeyRow(keyEntry)
+                }
+
+                // Add new API key form
+                if ollamaAPIKeys.count < 10 { // Limit to 10 keys
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Label (e.g., Production)", text: $newAPIKeyLabel)
+                            .font(Theme.Typography.body)
+                            #if os(iOS)
+                            .autocapitalization(.words)
+                            #endif
+
+                        SecureField("API Key", text: $newAPIKeyValue)
+                            .font(Theme.Typography.body)
+                            #if os(iOS)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
+                            #endif
+
+                        Button {
+                            addAPIKey()
+                        } label: {
+                            Label("Add Key", systemImage: "plus.circle")
+                                .font(Theme.Typography.body)
+                        }
+                        .disabled(newAPIKeyValue.isEmpty || newAPIKeyLabel.isEmpty)
+                    }
+                }
+            } header: {
+                Text("API Keys")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let error = apiKeyError {
+                        Text(error)
+                            .foregroundStyle(Theme.Colors.destructive)
+                    }
+                    if useRoundRobinKeySelection {
+                        Text("Round-robin enabled: Keys will be selected automatically based on token usage.")
+                    } else {
+                        Text("Add multiple API keys. Select which key to use, or enable round-robin below.")
+                    }
+                    if ollamaAPIKeys.count >= 10 {
+                        Text("Maximum 10 API keys supported.")
+                            .foregroundStyle(Theme.Colors.secondaryText)
                     }
                 }
             }
-            .disabled(isTestingConnection || (isOllamaCloudInstance && apiKey.isEmpty))
 
-            if let result = connectionTestResult {
-                switch result {
-                case .success:
-                    Label("Connected successfully", systemImage: "checkmark.circle")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.success)
-                case .failure(let message):
-                    Label(message, systemImage: "xmark.circle")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.destructive)
+            // Round-Robin Key Selection
+            Section {
+                Toggle(isOn: $useRoundRobinKeySelection) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dynamic Key Selection")
+                            .font(Theme.Typography.body)
+                        Text("Automatically balance token usage across all keys")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.secondaryText)
+                    }
+                }
+                .disabled(ollamaAPIKeys.count < 2)
+            } footer: {
+                if ollamaAPIKeys.count < 2 {
+                    Text("Add at least 2 API keys to enable round-robin selection")
+                } else if useRoundRobinKeySelection {
+                    Text("Keys will be rotated automatically to balance token usage. The key with the lowest usage will be selected for each request.")
+                }
+            }
+        }
+
+        // Connection Test
+        Section {
+            if ollamaMode == .cloud {
+                // Test all keys button for Cloud mode
+                Button {
+                    testAllOllamaAPIKeys()
+                } label: {
+                    HStack {
+                        Label("Test All Keys", systemImage: "antenna.radiowaves.left.and.right")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        if isTestingAllKeys {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                    }
+                }
+                .disabled(isTestingAllKeys || ollamaAPIKeys.isEmpty)
+
+                // Summary of test results
+                if !apiKeyTestResults.isEmpty {
+                    let validCount = apiKeyTestResults.values.filter { if case .success = $0 { return true }; return false }.count
+                    let invalidCount = apiKeyTestResults.count - validCount
+                    HStack {
+                        if validCount > 0 {
+                            Label("\(validCount) valid", systemImage: "checkmark.circle.fill")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Colors.success)
+                        }
+                        if invalidCount > 0 {
+                            Label("\(invalidCount) invalid", systemImage: "xmark.circle.fill")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Colors.destructive)
+                        }
+                    }
+                }
+            } else {
+                // Single test button for Local mode
+                Button {
+                    testOllamaConnection()
+                } label: {
+                    HStack {
+                        Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        if isTestingConnection {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                    }
+                }
+                .disabled(isTestingConnection)
+
+                if let result = connectionTestResult {
+                    switch result {
+                    case .success:
+                        Label("Connected successfully", systemImage: "checkmark.circle")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.success)
+                    case .failure(let message):
+                        Label(message, systemImage: "xmark.circle")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.destructive)
+                    }
                 }
             }
         } header: {
             Text("Connection")
         } footer: {
-            if isOllamaCloudInstance {
-                Text("Test your cloud Ollama connection with the provided API key")
+            if ollamaMode == .cloud {
+                Text("Test all API keys to verify they are valid")
             } else {
                 Text("Make sure Ollama is running on your machine before testing")
             }
         }
 
+        // About Section
         Section {
-            if isOllamaCloudInstance {
-                Text("Ollama Cloud is a hosted version of Ollama. Enter your server URL and API key to connect.")
+            if ollamaMode == .cloud {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ollama Cloud is a hosted version of Ollama. Use your API key to access cloud-hosted models.")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.secondaryText)
+
+                    Text("Key Endpoints:")
+                        .font(Theme.Typography.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Theme.Colors.secondaryText)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• /api/generate - Simple completions")
+                        Text("• /api/chat - Conversational AI")
+                        Text("• /api/embeddings - Vector embeddings")
+                        Text("• /api/list - List available models")
+                        Text("• /api/pull - Download models")
+                    }
                     .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Colors.secondaryText)
+                    .foregroundStyle(Theme.Colors.tertiaryText)
+                }
             } else {
                 Text("Ollama is a local LLM server that runs entirely on your machine. No API key or authentication is required for local instances.")
                     .font(Theme.Typography.caption)
@@ -1156,6 +1343,15 @@ struct ProviderSetupView: View {
             }
         } header: {
             Text("About Ollama")
+        }
+    }
+
+    /// Returns the effective base URL based on Ollama mode.
+    private var effectiveOllamaBaseURL: String {
+        if ollamaMode == .cloud {
+            return ollamaCloudBaseURL
+        } else {
+            return baseURL.isEmpty ? ollamaLocalBaseURL : baseURL
         }
     }
 
@@ -1336,9 +1532,18 @@ struct ProviderSetupView: View {
             }
         case .ollama:
             // For local Ollama, no auth is needed
-            // For cloud Ollama, API key is required
-            if isOllamaCloudInstance {
-                return !apiKey.isEmpty && connectionTestResult?.isSuccess == true
+            // For cloud Ollama, at least one valid API key is required
+            if ollamaMode == .cloud {
+                // Check if there's at least one API key
+                guard !ollamaAPIKeys.isEmpty else { return false }
+                // Check if the active key has been tested and is valid
+                if let activeKey = ollamaAPIKeys.first(where: { $0.isActive }) {
+                    if let result = apiKeyTestResults[activeKey.id], case .success = result {
+                        return true
+                    }
+                }
+                // Alternatively, if any key is valid, allow proceeding
+                return apiKeyTestResults.values.contains { if case .success = $0 { return true }; return false }
             }
             return true
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
@@ -1448,7 +1653,7 @@ struct ProviderSetupView: View {
 
                                         if model.supportsVision {
                                             Image(systemName: "eye")
-                                                .font(.caption2)
+                                                .font(.caption)
                                                 .foregroundStyle(Theme.Colors.tertiaryText)
                                         }
                                     }
@@ -1493,9 +1698,6 @@ struct ProviderSetupView: View {
             }
         }
         .formStyle(.grouped)
-        .safeAreaInset(edge: .bottom) {
-            continueButton(canProceed: selectedModelID != nil)
-        }
         .onAppear {
             // Only load defaults if we're not currently fetching and have no models
             if availableModels.isEmpty && !isFetchingModels {
@@ -1545,23 +1747,6 @@ struct ProviderSetupView: View {
             .padding(.vertical, Theme.Spacing.medium.rawValue)
             .background(.ultraThinMaterial)
         }
-    }
-
-    // MARK: - Continue Button
-
-    private func continueButton(canProceed: Bool) -> some View {
-        Button {
-            advanceToNextStep()
-        } label: {
-            Text("Continue")
-                .font(Theme.Typography.headline)
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(!canProceed)
-        .padding(.horizontal, Theme.Spacing.large.rawValue)
-        .padding(.vertical, Theme.Spacing.medium.rawValue)
-        .background(.ultraThinMaterial)
     }
 
     // MARK: - Computed Properties
@@ -1624,6 +1809,15 @@ struct ProviderSetupView: View {
         availableModels = provider.availableModels
         selectedAuthMethod = provider.authMethod
 
+        // Determine Ollama mode based on base URL
+        if providerType == .ollama {
+            if baseURL == ollamaCloudBaseURL {
+                ollamaMode = .cloud
+            } else {
+                ollamaMode = .local
+            }
+        }
+
         // Load custom headers for custom providers
         if providerType == .custom {
             customHeaders = provider.customHeaders.map { (key: $0.key, value: $0.value) }
@@ -1650,6 +1844,18 @@ struct ProviderSetupView: View {
                     isValidated = true
                 }
             case .ollama:
+                // Load multiple API keys for Ollama Cloud
+                if ollamaMode == .cloud {
+                    // Try to load API keys config first
+                    if let config = try? KeychainManager.shared.readAPIKeysConfig(providerID: provider.id), !config.keys.isEmpty {
+                        ollamaAPIKeys = config.keys
+                        useRoundRobinKeySelection = config.useRoundRobin
+                    } else if let key = try? KeychainManager.shared.readAPIKey(providerID: provider.id), !key.isEmpty {
+                        // Fallback: migrate single key to new format
+                        ollamaAPIKeys = [APIKeyEntry(label: "Primary", key: key, isActive: true)]
+                        useRoundRobinKeySelection = false
+                    }
+                }
                 isValidated = true
                 connectionTestResult = nil
             }
@@ -1749,9 +1955,8 @@ struct ProviderSetupView: View {
         isTestingConnection = true
         connectionTestResult = nil
 
-        let effectiveURL = baseURL.trimmingCharacters(in: .whitespaces).isEmpty
-            ? ProviderType.ollama.defaultBaseURL ?? "http://localhost:11434"
-            : baseURL
+        // Use effectiveOllamaBaseURL which accounts for mode
+        let effectiveURL = effectiveOllamaBaseURL
 
         Task {
             do {
@@ -1768,9 +1973,8 @@ struct ProviderSetupView: View {
                 request.httpMethod = "GET"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-                // Add Bearer token for cloud-hosted Ollama instances
-                let isCloud = isOllamaCloudInstance
-                if isCloud, !apiKey.isEmpty {
+                // Add Bearer token for cloud mode
+                if ollamaMode == .cloud, !apiKey.isEmpty {
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                 }
 
@@ -1781,10 +1985,6 @@ struct ProviderSetupView: View {
                         isTestingConnection = false
                         if httpResponse.statusCode == 200 {
                             connectionTestResult = .success
-                            // Update base URL if we used default
-                            if baseURL.trimmingCharacters(in: .whitespaces).isEmpty {
-                                baseURL = effectiveURL
-                            }
                         } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                             connectionTestResult = .failure("Authentication failed. Check your API key.")
                         } else {
@@ -1809,6 +2009,249 @@ struct ProviderSetupView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Ollama Multiple API Keys Management
+
+    /// Renders a single API key row.
+    @ViewBuilder
+    private func ollamaAPIKeyRow(_ keyEntry: APIKeyEntry) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(keyEntry.label)
+                        .font(Theme.Typography.body)
+                    // Show "Active" badge only when NOT using round-robin
+                    if !useRoundRobinKeySelection && keyEntry.isActive {
+                        Text("Active")
+                            .font(Theme.Typography.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.Colors.accent)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                    }
+                }
+                Text(String(repeating: "•", count: min(keyEntry.key.count, 20)))
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.tertiaryText)
+
+                // Test result indicator
+                if let result = apiKeyTestResults[keyEntry.id] {
+                    switch result {
+                    case .success:
+                        HStack(spacing: 2) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 10))
+                            Text("Valid")
+                                .font(Theme.Typography.caption)
+                        }
+                        .foregroundStyle(Theme.Colors.success)
+                    case .failure(let message):
+                        HStack(spacing: 2) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                            Text(message)
+                                .font(Theme.Typography.caption)
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(Theme.Colors.destructive)
+                    }
+                }
+            }
+            Spacer()
+
+            // Select as active button - only show when NOT using round-robin
+            if !useRoundRobinKeySelection && !keyEntry.isActive {
+                Button {
+                    setActiveAPIKey(keyEntry.id)
+                } label: {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Theme.Colors.tertiaryText)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Delete button
+            Button(role: .destructive) {
+                deleteAPIKey(keyEntry.id)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.Colors.destructive)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Adds a new API key to the list.
+    private func addAPIKey() {
+        guard !newAPIKeyValue.isEmpty && !newAPIKeyLabel.isEmpty else { return }
+
+        let trimmedKey = newAPIKeyValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Check for duplicate key
+        if ollamaAPIKeys.contains(where: { $0.key == trimmedKey }) {
+            apiKeyError = "This API key is already added"
+            return
+        }
+
+        // If this is the first key, make it active (unless round-robin is enabled)
+        let isActive = ollamaAPIKeys.isEmpty && !useRoundRobinKeySelection
+
+        let newEntry = APIKeyEntry(
+            label: newAPIKeyLabel.trimmingCharacters(in: .whitespacesAndNewlines),
+            key: trimmedKey,
+            isActive: isActive
+        )
+
+        ollamaAPIKeys.append(newEntry)
+
+        // Clear input fields
+        newAPIKeyLabel = ""
+        newAPIKeyValue = ""
+        apiKeyError = nil
+
+        // Clear previous test results
+        apiKeyTestResults.removeValue(forKey: newEntry.id)
+    }
+
+    /// Deletes an API key from the list.
+    private func deleteAPIKey(_ keyID: UUID) {
+        let wasActive = ollamaAPIKeys.first { $0.id == keyID }?.isActive ?? false
+        ollamaAPIKeys.removeAll { $0.id == keyID }
+        apiKeyTestResults.removeValue(forKey: keyID)
+
+        // If we deleted the active key, make the first remaining key active
+        if wasActive && !ollamaAPIKeys.isEmpty {
+            ollamaAPIKeys[0].isActive = true
+        }
+    }
+
+    /// Sets an API key as the active one.
+    private func setActiveAPIKey(_ keyID: UUID) {
+        for i in ollamaAPIKeys.indices {
+            ollamaAPIKeys[i].isActive = (ollamaAPIKeys[i].id == keyID)
+        }
+    }
+
+    /// Tests all Ollama Cloud API keys and reports results.
+    private func testAllOllamaAPIKeys() {
+        guard !ollamaAPIKeys.isEmpty else { return }
+
+        isTestingAllKeys = true
+        apiKeyTestResults = [:]
+
+        Task {
+            let effectiveURL = effectiveOllamaBaseURL
+
+            // Test each key concurrently
+            await withTaskGroup(of: (UUID, ConnectionTestResult).self) { group in
+                for keyEntry in ollamaAPIKeys {
+                    group.addTask {
+                        let result = await self.testSingleAPIKey(
+                            keyEntry.key,
+                            baseURL: effectiveURL
+                        )
+                        return (keyEntry.id, result)
+                    }
+                }
+
+                // Collect results
+                for await (keyID, result) in group {
+                    await MainActor.run {
+                        apiKeyTestResults[keyID] = result
+                    }
+                }
+            }
+
+            await MainActor.run {
+                isTestingAllKeys = false
+            }
+        }
+    }
+
+    /// Tests a single API key against the Ollama Cloud endpoint.
+    private func testSingleAPIKey(_ key: String, baseURL: String) async -> ConnectionTestResult {
+        // Use /api/generate endpoint which requires valid authentication
+        // We send a minimal request to verify the key without generating much content
+        guard let url = URL(string: "\(baseURL)/api/generate") else {
+            return .failure("Invalid URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
+
+        // Minimal request body - just verify auth, don't actually generate
+        let body: [String: Any] = [
+            "model": "llama3.2:1b",  // Small model
+            "prompt": "Hi",
+            "stream": false
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                switch httpResponse.statusCode {
+                case 200:
+                    // Check if response contains valid data (not an error message)
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        // If there's an "error" key, the key might be valid but request failed
+                        if let error = json["error"] as? String {
+                            // Check if it's an auth error vs model not found
+                            if error.lowercased().contains("unauthorized") ||
+                               error.lowercased().contains("invalid") ||
+                               error.lowercased().contains("authentication") {
+                                return .failure("Invalid key")
+                            }
+                            // Model not found or other error - key is valid
+                            return .success
+                        }
+                        return .success
+                    }
+                    return .success
+                case 401, 403:
+                    // Unauthorized - key is invalid
+                    return .failure("Invalid key")
+                case 404:
+                    // Not found - could be model not found, but key is valid
+                    // Check response body for auth errors
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let error = json["error"] as? String {
+                        if error.lowercased().contains("unauthorized") ||
+                           error.lowercased().contains("invalid") ||
+                           error.lowercased().contains("authentication") {
+                            return .failure("Invalid key")
+                        }
+                    }
+                    // 404 with no auth error means key is valid, just model/endpoint not found
+                    return .success
+                default:
+                    // For other status codes, check if it's an auth error in the body
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let error = json["error"] as? String {
+                        if error.lowercased().contains("unauthorized") ||
+                           error.lowercased().contains("invalid") ||
+                           error.lowercased().contains("authentication") {
+                            return .failure("Invalid key")
+                        }
+                    }
+                    return .failure("Status \(httpResponse.statusCode)")
+                }
+            }
+            return .failure("No response")
+        } catch {
+            if let urlError = error as? URLError {
+                return .failure(urlError.localizedDescription)
+            }
+            return .failure(error.localizedDescription)
         }
     }
 
@@ -1910,9 +2353,9 @@ struct ProviderSetupView: View {
                     isEnabled: true,
                     isDefault: false,
                     sortOrder: 0,
-                    baseURL: baseURL.isEmpty ? nil : baseURL,
+                    baseURL: providerType == .ollama ? effectiveOllamaBaseURL : (baseURL.isEmpty ? nil : baseURL),
                     customHeaders: Dictionary(uniqueKeysWithValues: customHeaders.filter { !$0.key.isEmpty }.map { ($0.key, $0.value) }),
-                    authMethod: providerType == .ollama ? .none : .apiKey,
+                    authMethod: providerType == .ollama ? (ollamaMode == .cloud ? .apiKey : .none) : .apiKey,
                     oauthClientID: nil,
                     oauthAuthURL: nil,
                     oauthTokenURL: nil,
@@ -1921,7 +2364,7 @@ struct ProviderSetupView: View {
                     defaultModelID: nil,
                     costPerInputToken: nil,
                     costPerOutputToken: nil,
-                    effectiveBaseURL: baseURL.isEmpty ? providerType.defaultBaseURL : baseURL,
+                    effectiveBaseURL: providerType == .ollama ? effectiveOllamaBaseURL : (baseURL.isEmpty ? providerType.defaultBaseURL : baseURL),
                     effectiveAPIPath: apiPath,
                     defaultModel: nil,
                     apiFormat: apiFormat,
@@ -2051,10 +2494,11 @@ struct ProviderSetupView: View {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        // Add Bearer token for cloud-hosted Ollama instances
-        let isCloud = isOllamaCloudInstance
-        if isCloud, !apiKey.isEmpty {
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        // Add Bearer token for cloud mode - use active key from ollamaAPIKeys
+        if ollamaMode == .cloud {
+            if let activeKey = ollamaAPIKeys.first(where: { $0.isActive }) {
+                request.setValue("Bearer \(activeKey.key)", forHTTPHeaderField: "Authorization")
+            }
         }
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -2166,7 +2610,8 @@ struct ProviderSetupView: View {
         case .anthropic, .openai, .zhipu, .zhipuAnthropic:
             authMethod = selectedAuthMethod == .oauth ? .oauth : .apiKey
         case .ollama:
-            authMethod = .none
+            // Ollama Cloud requires API key, local Ollama doesn't
+            authMethod = ollamaMode == .cloud ? .apiKey : .none
         case .zhipuCoding, .groq, .cerebras, .mistral, .deepSeek, .together,
              .fireworks, .openRouter, .siliconFlow, .xAI, .perplexity, .google, .kilo:
             authMethod = .apiKey
@@ -2197,7 +2642,8 @@ struct ProviderSetupView: View {
             config = existing
             config.name = name
             config.providerType = providerType
-            config.baseURL = baseURL.isEmpty ? nil : baseURL
+            // Use effectiveOllamaBaseURL for Ollama providers
+            config.baseURL = providerType == .ollama ? (effectiveOllamaBaseURL.isEmpty ? nil : effectiveOllamaBaseURL) : (baseURL.isEmpty ? nil : baseURL)
             config.defaultModelID = selectedModelID
             config.availableModels = availableModels
             config.customHeaders = headersDict
@@ -2213,11 +2659,16 @@ struct ProviderSetupView: View {
 
             config.touch()
         } else {
+            // Use effectiveOllamaBaseURL for Ollama providers
+            let effectiveBaseURL: String? = providerType == .ollama
+                ? (effectiveOllamaBaseURL.isEmpty ? nil : effectiveOllamaBaseURL)
+                : (baseURL.isEmpty ? nil : baseURL)
+
             config = ProviderConfig(
                 name: name,
                 providerType: providerType,
                 isDefault: shouldBeDefault,
-                baseURL: baseURL.isEmpty ? nil : baseURL,
+                baseURL: effectiveBaseURL,
                 customHeaders: headersDict,
                 authMethod: authMethod,
                 oauthClientID: providerType == .custom && authMethod == .oauth ? (oauthClientID.isEmpty ? nil : oauthClientID) : nil,
@@ -2233,7 +2684,21 @@ struct ProviderSetupView: View {
         // Save credentials to Keychain based on auth method
         switch authMethod {
         case .apiKey, .bearer:
-            if !apiKey.isEmpty {
+            // For Ollama Cloud, save multiple API keys
+            if providerType == .ollama && ollamaMode == .cloud {
+                do {
+                    // Save the active key as the primary API key for backward compatibility
+                    if let activeKey = ollamaAPIKeys.first(where: { $0.isActive }) {
+                        try KeychainManager.shared.saveAPIKey(activeKey.key, providerID: config.id)
+                    }
+                    // Save all keys with round-robin config
+                    let config2 = APIKeysConfig(keys: ollamaAPIKeys, useRoundRobin: useRoundRobinKeySelection)
+                    try KeychainManager.shared.saveAPIKeysConfig(providerID: config.id, config: config2)
+                    Self.logger.info("Successfully saved \(ollamaAPIKeys.count) API key(s) for Ollama Cloud '\(config.name)' (roundRobin: \(useRoundRobinKeySelection))")
+                } catch {
+                    Self.logger.error("Failed to save API keys for '\(config.name)': \(error.localizedDescription)")
+                }
+            } else if !apiKey.isEmpty {
                 do {
                     try KeychainManager.shared.saveAPIKey(apiKey, providerID: config.id)
                     Self.logger.info("Successfully saved API key for '\(config.name)' (providerID: \(config.id), key length: \(apiKey.count))")

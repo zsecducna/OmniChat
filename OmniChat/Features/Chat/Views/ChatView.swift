@@ -566,6 +566,22 @@ struct ChatView: View {
         if let vm = viewModel {
             HStack {
                 Spacer()
+                // Show API key label if round-robin is active
+                if let keyLabel = vm.currentAPIKeyLabel {
+                    HStack(spacing: 4) {
+                        Image(systemName: "key.fill")
+                            .font(.system(size: 8))
+                        Text(keyLabel)
+                            .font(Theme.Typography.caption)
+                    }
+                    .foregroundStyle(Theme.Colors.secondaryText)
+                    .padding(.horizontal, Theme.Spacing.small.rawValue)
+                    .padding(.vertical, Theme.Spacing.tight.rawValue)
+                    .background(
+                        Capsule()
+                            .fill(Theme.Colors.tertiaryBackground)
+                    )
+                }
                 UsageMonitorView(
                     providerConfig: vm.currentProviderConfig,
                     isStreaming: vm.isStreaming
