@@ -48,42 +48,9 @@ public struct AdaptiveColor: ShapeStyle, Sendable {
 }
 
 // MARK: - Adaptive Color View Extension
-
-extension View {
-    /// Applies an adaptive color as a foreground style.
-    /// - Parameter adaptiveColor: The adaptive color to use
-    /// - Returns: A view with the adaptive foreground color applied
-    public func foregroundStyle(_ adaptiveColor: AdaptiveColor) -> some View {
-        self.modifier(AdaptiveColorModifier(adaptiveColor: adaptiveColor))
-    }
-
-    /// Applies an adaptive color as a background.
-    /// - Parameter adaptiveColor: The adaptive color to use
-    /// - Returns: A view with the adaptive background color applied
-    public func background(_ adaptiveColor: AdaptiveColor) -> some View {
-        self.modifier(AdaptiveBackgroundModifier(adaptiveColor: adaptiveColor))
-    }
-}
-
-/// View modifier that applies an adaptive foreground color.
-private struct AdaptiveColorModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-    let adaptiveColor: AdaptiveColor
-
-    func body(content: Content) -> some View {
-        content.foregroundStyle(adaptiveColor.resolve(in: colorScheme))
-    }
-}
-
-/// View modifier that applies an adaptive background color.
-private struct AdaptiveBackgroundModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-    let adaptiveColor: AdaptiveColor
-
-    func body(content: Content) -> some View {
-        content.background(adaptiveColor.resolve(in: colorScheme))
-    }
-}
+// Note: AdaptiveColor conforms to ShapeStyle, so it can be used directly with
+// .foregroundStyle(), .background(), and .fill() without custom extension methods.
+// SwiftUI will automatically handle the adaptive resolution via the ShapeStyle conformance.
 
 // MARK: - Theme
 
@@ -462,6 +429,7 @@ private extension Color {
 
 // MARK: - Preview Helpers
 
+@MainActor
 private struct ColorChip: View {
     let color: Color
     let name: String
@@ -478,6 +446,7 @@ private struct ColorChip: View {
     }
 }
 
+@MainActor
 private struct SpacingPreview: View {
     let spacing: Theme.Spacing
     let name: String
@@ -499,6 +468,7 @@ private struct SpacingPreview: View {
     }
 }
 
+@MainActor
 private struct CornerRadiusPreview: View {
     let radius: Theme.CornerRadius
     let name: String
@@ -516,6 +486,7 @@ private struct CornerRadiusPreview: View {
     }
 }
 
+@MainActor
 private struct AdaptiveColorPreview: View {
     let adaptiveColor: AdaptiveColor
     let name: String

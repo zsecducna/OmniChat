@@ -255,7 +255,7 @@ final class ProviderManager {
 
         // OpenRouter - use dedicated adapter with app attribution headers
         case .openRouter:
-            adapter = try OpenRouterAdapter(config: snapshot, apiKey: apiKey)
+            adapter = OpenRouterAdapter(config: snapshot, apiKey: apiKey)
             Self.logger.debug("Created OpenRouter adapter for '\(config.name)'")
 
         // OpenAI-compatible providers - use OpenAIAdapter with custom baseURL

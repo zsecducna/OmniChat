@@ -4,7 +4,11 @@ A universal AI chat application for Apple platforms (iOS 17+, iPadOS 17+, macOS 
 
 ## Features
 
-- **Multi-Provider Support**: Configure and switch between Anthropic Claude, OpenAI ChatGPT, Ollama (local LLMs), and custom endpoints
+- **Multi-Provider Support**: Configure and switch between Anthropic Claude, OpenAI ChatGPT, Ollama, Z.AI, and 15+ other providers
+- **Multiple API Keys**: Configure multiple API keys per provider with intelligent key selection
+  - Round-robin key rotation based on token usage
+  - Manual key selection with active key indicator
+  - Dynamic model access validation per key (Z.AI subscriptions)
 - **Raycast-Inspired Dense UI**: Compact 4-6pt message spacing, keyboard-first navigation, no avatars
 - **iCloud Sync**: Conversations and settings sync across all your Apple devices via CloudKit
 - **Streaming Responses**: Real-time token-by-token rendering with markdown support
@@ -76,16 +80,50 @@ _Coming soon - currently in development_
 
 ### Supported Providers
 
-| Provider | Authentication | Notes |
-|----------|---------------|-------|
-| **Anthropic Claude** | API Key or OAuth | Claude 4, 3.5, and 3 models |
-| **OpenAI ChatGPT** | API Key | GPT-4o, GPT-4 Turbo, o1 models |
-| **Ollama** | None (local) | Requires Ollama running locally |
-| **Custom** | API Key / Bearer / OAuth | OpenAI or Anthropic-compatible APIs |
+| Provider | Authentication | Multiple Keys | Notes |
+|----------|---------------|---------------|-------|
+| **Anthropic Claude** | API Key or OAuth | No | Claude 4, 3.5, and 3 models |
+| **OpenAI ChatGPT** | API Key | No | GPT-4o, GPT-4 Turbo, o1 models |
+| **Ollama Local** | None | N/A | Requires Ollama running locally |
+| **Ollama Cloud** | API Key | Yes (10 max) | Hosted Ollama with round-robin key selection |
+| **Z.AI (Zhipu)** | API Key | Yes (10 max) | GLM models with subscription-based access |
+| **Groq** | API Key | No | Ultra-fast inference |
+| **Cerebras** | API Key | No | Fast inference |
+| **Mistral** | API Key | No | Mistral models |
+| **DeepSeek** | API Key | No | DeepSeek models |
+| **Together AI** | API Key | No | Many open-source models |
+| **Fireworks** | API Key | No | Fast serverless inference |
+| **OpenRouter** | API Key | No | Unified API for many providers |
+| **xAI** | API Key | No | Grok models |
+| **Perplexity** | API Key | No | Sonar models |
+| **Google AI** | API Key | No | Gemini models |
+| **Custom** | API Key / Bearer / OAuth | No | OpenAI or Anthropic-compatible APIs |
+
+### Multiple API Keys Feature
+
+For providers that support multiple API keys (Ollama Cloud, Z.AI), you can:
+
+1. **Add up to 10 API keys** per provider configuration
+2. **Label each key** for easy identification (e.g., "Production", "Development", "Elite Plan")
+3. **Choose selection mode**:
+   - **Manual**: Select which key to use actively
+   - **Dynamic (Round-Robin)**: Automatically selects the key with lowest token usage
+4. **Validate keys** before saving with built-in connection testing
+5. **Track usage** per key for load balancing
+
+**Z.AI-specific features:**
+- Dynamic model access validation based on subscription tier
+- Automatic fallback when selected model isn't available for current key
+- Priority: GLM-5 > GLM-4.7 > GLM-4 > latest available
 
 ### API Keys
 
 API keys are stored securely in the iOS/macOS Keychain with iCloud Keychain sync enabled. Keys never leave your device except through the respective AI provider APIs.
+
+**Multiple Keys**: For Ollama Cloud and Z.AI providers, you can configure multiple API keys per provider. This enables:
+- Load balancing across multiple accounts/subscriptions
+- Fallback when one key reaches rate limits
+- Different subscription tiers with varying model access (Z.AI)
 
 ### iCloud Sync
 
