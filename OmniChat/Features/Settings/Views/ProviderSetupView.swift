@@ -1107,6 +1107,13 @@ struct ProviderSetupView: View {
     /// Ollama Cloud base URL (endpoints like /api/chat are appended by the adapter)
     private let ollamaCloudBaseURL = "https://ollama.com"
 
+    /// Default local Ollama URL
+    private let ollamaLocalBaseURL = "http://localhost:11434"
+
+    @ViewBuilder
+    private var ollamaConfigurationSection: some View {
+        // Mode Picker - Local vs Cloud
+        Section {
             Picker("Connection Mode", selection: $ollamaMode) {
                 ForEach(OllamaMode.allCases) { mode in
                     Text(mode.title)
@@ -1135,23 +1142,14 @@ struct ProviderSetupView: View {
             } footer: {
                 Text("Default: \(ollamaLocalBaseURL) - Local Ollama runs without authentication")
             }
-            }
             .onAppear {
                 if baseURL.isEmpty {
                     baseURL = ollamaLocalBaseURL
                 }
             }
             .onChange(of: ollamaMode) { oldValue, newValue in
-                if newValue == .local && baseURL.isEmpty {
-                    baseURL = ollamaLocalBaseURL
-                }
-            }
-            .onChange(of: ollamaMode) { oldValue, newValue in
                 if newValue == .local {
-                    // Reset to default local URL when switching to local mode
-                    if oldValue == .cloud {
-                        baseURL = ollamaLocalBaseURL
-                    }
+                    baseURL = ollamaLocalBaseURL
                 } else if newValue == .cloud {
                     baseURL = ollamaCloudBaseURL
                 }
